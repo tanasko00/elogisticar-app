@@ -97,7 +97,10 @@ function renderArhivaTura(ture) {
                     <td style="color: #94a3b8;">📍 ${t.polaziste} ➔ ${t.odrediste}</td>
                     <td style="color: #94a3b8;">${t.datum}</td>
                     <td>${getStatusBadge(t.status)}</td>
-                    <td><button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button></td>
+                    <td style="display: flex; gap: 8px;">
+                        <button style="background-color: #3b82f6; color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 6px; cursor: pointer;" onclick="stampajPutniNalog(${t.id})">🖨️ PDF</button>
+                        <button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button>
+                    </td>
                 </tr>`
     ).join('');
 }
@@ -587,5 +590,85 @@ async function dodajVozilo() {
         document.getElementById("voz_nosivost").value = "";
     }
 }
+
+
+function stampajPutniNalog(idTure) {
+   
+            const tura = sveTurePodaci.find(t => t.id === idTure);
+            if (!tura) return alert("Podaci o turi nisu pronađeni.");
+
+
+            const prozor = window.open('', '_blank', 'width=800,height=900');
+            
+
+            prozor.document.write(`
+                <html>
+                <head>
+                    <title>Putni Nalog TR-${tura.id + 2800}</title>
+                    <style>
+                        body { font-family: 'Arial', sans-serif; padding: 40px; color: #000; background: #fff; }
+                        .zaglavlje { text-align: center; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 40px; }
+                        h1 { margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px; }
+                        .podnaslov { font-size: 14px; color: #555; margin-top: 5px; }
+                        .sekcija { margin-bottom: 25px; font-size: 16px; line-height: 1.8; }
+                        .oznaka { font-weight: bold; min-width: 150px; display: inline-block; }
+                        .linija-podataka { border-bottom: 1px dotted #ccc; display: inline-block; width: 60%; }
+                        .potpisi { margin-top: 100px; display: flex; justify-content: space-between; }
+                        .mesto-potpis { border-top: 1px solid #000; width: 250px; text-align: center; padding-top: 8px; font-size: 14px; }
+                        
+                        /* Sakrivamo dugmad i suvišne elemente prilikom samog čuvanja u PDF */
+                        @media print {
+                            @page { margin: 2cm; }
+                            body { -webkit-print-color-adjust: exact; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="zaglavlje">
+                        <h1>Zvanični Putni Nalog</h1>
+                        <div class="podnaslov">Dokument za transport robe u domaćem saobraćaju</div>
+                    </div>
+                    
+                    <div class="sekcija">
+                        <span class="oznaka">Serijski broj:</span> 
+                        <span class="linija-podataka">TR-${tura.id + 2800}</span>
+                    </div>
+                    <div class="sekcija">
+                        <span class="oznaka">Datum izdavanja:</span> 
+                        <span class="linija-podataka">${tura.datum}</span>
+                    </div>
+                    <div class="sekcija">
+                        <span class="oznaka">Zaduženi vozač:</span> 
+                        <span class="linija-podataka">${tura.vozac}</span>
+                    </div>
+                    <div class="sekcija">
+                        <span class="oznaka">Vozilo (Registracija):</span> 
+                        <span class="linija-podataka">${tura.vozilo}</span>
+                    </div>
+                    <div class="sekcija">
+                        <span class="oznaka">Relacija vožnje:</span> 
+                        <span class="linija-podataka">${tura.polaziste} ➔ ${tura.odrediste}</span>
+                    </div>
+                    <div class="sekcija">
+                        <span class="oznaka">Trenutni status:</span> 
+                        <span class="linija-podataka">${tura.status}</span>
+                    </div>
+
+                    <div class="potpisi">
+                        <div class="mesto-potpis">Potpis ovlašćenog dispečera</div>
+                        <div class="mesto-potpis">Potpis odgovornog vozača</div>
+                    </div>
+                </body>
+                </html>
+            `);
+            
+            prozor.document.close();
+            prozor.focus();
+            
+
+            setTimeout(() => {
+                prozor.print();
+            }, 500);
+        }
 
 ucitajInicijalno();
