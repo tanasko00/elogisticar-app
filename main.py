@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles # DODATO OVO
 from pydantic import BaseModel
 from typing import List, Optional
 import sqlite3
@@ -7,6 +8,7 @@ from datetime import datetime, timedelta
 
 app = FastAPI()
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 def inicijalizuj_bazu():
     konekcija = sqlite3.connect("elogisticar.db")

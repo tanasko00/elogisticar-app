@@ -1,0 +1,591 @@
+let trenutniZahtevi = [];
+let prikazaniDatumKalendara = new Date();
+let mapaTuraZaKalendar = {};
+let sveTurePodaci = [];
+
+document.getElementById("izbor_vozila").addEventListener("change", function() {
+    const tip = this.options[this.selectedIndex].getAttribute("data-tip");
+    const opisInput = document.getElementById("opis_robe");
+    if (tip === "Cisterna") {
+        opisInput.placeholder = "Unesi tečnost (npr. 5000 litara)";
+    } else if (tip === "Teretnjak") {
+        opisInput.placeholder = "Opis robe (npr. 2 palete ili 500 kg)";
+    } else {
+        opisInput.placeholder = "Opis robe";
+    }
+    osveziPrikazKapaciteta();
+});
+
+function promijeniTab(idTaba, element) {
+    document.querySelectorAll('.sadrzaj-taba').forEach(tab => tab.style.display = 'none');
+    document.querySelectorAll('.nav-item').forEach(link => link.classList.remove('active'));
+
+    document.getElementById(idTaba).style.display = 'block';
+    element.classList.add('active');
+    document.getElementById('naslov-stranice').innerText = element.innerText;
+
+    if (idTaba === 'tab-vozila') ucitajSvaVozila();
+    if (idTaba === 'tab-vozaci') ucitajSveVozace();
+    if (idTaba === 'tab-kupci') ucitajSveKupce();
+    if (idTaba === 'tab-ture') ucitajArhivuTura();
+}
+
+function postaviPodatkeKorisnika() {
+    const ime = localStorage.getItem("korisnik_ime") || "Nepoznat";
+    const prezime = localStorage.getItem("korisnik_prezime") || "Korisnik";
+    const rola = localStorage.getItem("korisnik_rola") || "Dispečer";
+
+    document.getElementById("profil-ime-tekst").innerText = `${ime} ${prezime}`;
+    document.getElementById("profil-rola-tekst").innerText = rola;
+    document.getElementById("profil-inicijali").innerText = ime.charAt(0) + prezime.charAt(0);
+}
+
+function postaviDanasnjiDatum() {
+    const opcije = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    };
+    const danasnjiTekst = new Date().toLocaleDateString('sr-RS', opcije);
+    document.getElementById("tekst-datum").innerText = "Pregled · " + danasnjiTekst;
+}
+
+function odjaviSe() {
+    localStorage.clear();
+    window.location.href = "/";
+}
+
+function formatirajDatumZaAPI(datum) {
+    return datum.toISOString().split('T')[0];
+}
+
+async function osveziStatistiku() {
+    try {
+        const odg = await fetch("/statistika");
+        const stat = await odg.json();
+        document.getElementById("stat-dostupna").innerText = stat.dostupna_vozila;
+        document.getElementById("stat-ukupno").innerText = `od ${stat.ukupno_vozila} u floti`;
+        document.getElementById("stat-aktivne").innerText = stat.aktivne_ture;
+        document.getElementById("stat-zavrseno").innerText = stat.zavrseno_danas;
+    } catch (err) {
+        console.error("Greška statistike", err);
+    }
+}
+
+async function ucitajArhivuTura() {
+    try {
+        const odg = await fetch("/sve-ture");
+        sveTurePodaci = await odg.json();
+        renderArhivaTura(sveTurePodaci);
+    } catch (err) {
+        console.error("Greška pri učitavanju arhive tura", err);
+    }
+}
+
+function renderArhivaTura(ture) {
+    const tbody = document.getElementById("tabela-arhiva-tura");
+    if (ture.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b; padding: 20px;">Nema pronađenih tura za zadane filtere.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = ture.map(t =>
+        `<tr>
+                    <td style="color: #3b82f6; font-weight: 500;">TR-${t.id + 2800}</td>
+                    <td>${t.vozac}</td>
+                    <td style="color: #94a3b8;">${t.vozilo}</td>
+                    <td style="color: #94a3b8;">📍 ${t.polaziste} ➔ ${t.odrediste}</td>
+                    <td style="color: #94a3b8;">${t.datum}</td>
+                    <td>${getStatusBadge(t.status)}</td>
+                    <td><button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button></td>
+                </tr>`
+    ).join('');
+}
+
+function filtrirajArhivu() {
+    const pretraga = document.getElementById("filter-pretraga").value.toLowerCase();
+    const status = document.getElementById("filter-status").value;
+    const datum = document.getElementById("filter-datum").value;
+
+    const filtrirano = sveTurePodaci.filter(t => {
+        const matchPretraga = (t.vozac && t.vozac.toLowerCase().includes(pretraga)) ||
+            (t.vozilo && t.vozilo.toLowerCase().includes(pretraga)) ||
+            (t.polaziste && t.polaziste.toLowerCase().includes(pretraga)) ||
+            (t.odrediste && t.odrediste.toLowerCase().includes(pretraga));
+
+        const matchStatus = status === "" || t.status === status;
+
+        const matchDatum = datum === "" || (t.datum && t.datum.includes(datum));
+
+        return matchPretraga && matchStatus && matchDatum;
+    });
+
+    renderArhivaTura(filtrirano);
+}
+
+function resetujFiltereTura() {
+    document.getElementById("filter-pretraga").value = "";
+    document.getElementById("filter-status").value = "";
+    document.getElementById("filter-datum").value = "";
+    renderArhivaTura(sveTurePodaci);
+}
+
+async function ucitajInicijalno() {
+    postaviPodatkeKorisnika();
+    postaviDanasnjiDatum();
+
+    const odg = await fetch("/podaci-za-dispecera");
+    const p = await odg.json();
+
+    document.getElementById("izbor_kupca").innerHTML = '<option value="">Izaberi kupca...</option>' + p.kupci.map(k => `<option value="${k.pib}">${k.naziv}</option>`).join('');
+    document.getElementById("izbor_vozaca").innerHTML = '<option value="">Izaberi vozača...</option>' + p.vozaci.map(v => `<option value="${v.id}">${v.ime}</option>`).join('');
+
+    document.getElementById("izbor_vozila").innerHTML = '<option value="" data-tip="" data-nosivost="0">Izaberi vozilo...</option>' + p.vozila.map(v => {
+        const jedinica = v.tip === "Cisterna" ? "L" : "t";
+        return `<option value="${v.registracija}" data-tip="${v.tip}" data-nosivost="${v.nosivost}">${v.registracija} (${v.marka} - Max: ${v.nosivost} ${jedinica})</option>`;
+    }).join('');
+
+    document.getElementById('datum_ture').valueAsDate = new Date();
+
+    osveziKalendar();
+    ucitajTure();
+    osveziStatistiku();
+}
+
+function pomeriKalendar(dani) {
+    prikazaniDatumKalendara.setDate(prikazaniDatumKalendara.getDate() + dani);
+    osveziKalendar();
+}
+
+async function osveziKalendar() {
+    const datumParam = formatirajDatumZaAPI(prikazaniDatumKalendara);
+    const odg = await fetch(`/sedmicni-pregled?pocetni_datum=${datumParam}`);
+    const podaci = await odg.json();
+
+    mapaTuraZaKalendar = {};
+
+    let header = "<th>Registracija vozila</th>";
+    podaci.dani.forEach(d => header += `<th>${d}</th>`);
+    document.getElementById("kalendar-header").innerHTML = header;
+
+    let html = "";
+    for (const [reg, daniObj] of Object.entries(podaci.zauzece)) {
+        const info = podaci.detalji_vozila[reg] || {
+            tip: "Teretnjak",
+            nosivost: 0
+        };
+        const jedinica = info.tip === "Cisterna" ? "L" : "t";
+
+        html += `<tr><td><strong>${reg}</strong><br><span style="font-size:11px; color:#94a3b8;">${info.tip} (${info.nosivost} ${jedinica})</span></td>`;
+        podaci.dani.forEach(d => {
+            const turaInfo = daniObj[d];
+            if (turaInfo && typeof turaInfo === 'object' && turaInfo.status !== "Završeno") {
+                const kljuc = `${reg}_${d}`;
+                mapaTuraZaKalendar[kljuc] = turaInfo;
+
+                html += `<td class="zauzeto" onclick="otvoriModalTure('${kljuc}', '${reg}', '${d}')" style="cursor: pointer;" title="Klikni za detalje">
+                                    Zauzeto<br><span style="font-size:10px; font-weight: normal; color:#f87171;">(${turaInfo.status})</span>
+                                 </td>`;
+            } else if (typeof turaInfo === 'string' && turaInfo !== "Završeno") {
+                html += `<td class="zauzeto">Zauzeto<br><span style="font-size:10px; font-weight: normal; color:#f87171;">(${turaInfo})</span></td>`;
+            } else {
+                html += `<td class="slobodno">Slobodno</td>`;
+            }
+        });
+        html += `</tr>`;
+    }
+    document.getElementById("kalendar-body").innerHTML = html;
+}
+
+function otvoriModalTure(kljuc, reg, datum) {
+    const tura = mapaTuraZaKalendar[kljuc];
+    if (!tura) return;
+
+    document.getElementById("modal-naslov-ture").innerText = `Tura TR-${tura.id + 2800} (${reg})`;
+
+    let robaHtml = tura.roba && tura.roba.length > 0 ?
+        tura.roba.map(r => `<li style="margin-left:15px;">${r}</li>`).join('') :
+        "<i>Nema detalja o robi</i>";
+
+    document.getElementById("modal-sadrzaj-ture").innerHTML = `
+                <div><strong style="color:#94a3b8;">Datum:</strong> ${datum}</div>
+                <div><strong style="color:#94a3b8;">Vozač:</strong> ${tura.vozac}</div>
+                <div><strong style="color:#94a3b8;">Relacija:</strong>  ${tura.polaziste} ➔ ${tura.odrediste}</div>
+                <div><strong style="color:#94a3b8;">Status:</strong> <span style="color:#fbbf24;">${tura.status}</span></div>
+                <div style="border-top: 1px dashed #334155; padding-top: 8px; margin-top: 4px;">
+                    <strong style="color:#94a3b8;">Utovareni teret:</strong>
+                    <ul style="margin-top: 4px; color: #38bdf8;">${robaHtml}</ul>
+                </div>
+            `;
+
+    document.getElementById("modal-detalje-ture").style.display = "flex";
+}
+
+function zatvoriModalTure() {
+    document.getElementById("modal-detalje-ture").style.display = "none";
+}
+
+function osveziPrikazKapaciteta() {
+    const voziloSelect = document.getElementById("izbor_vozila");
+    const kontejner = document.getElementById("prikaz-popunjenosti");
+
+    if (!voziloSelect.value) {
+        kontejner.style.display = "none";
+        return;
+    }
+
+    const tipVozila = voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-tip");
+    const maxNosivost = parseFloat(voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-nosivost")) || 0;
+    const jedinica = tipVozila === "Cisterna" ? "L" : "t";
+
+    let trenutnoZauzeto = 0;
+    trenutniZahtevi.forEach(zahtev => {
+        const zMala = zahtev.roba.toLowerCase();
+        const m = zahtev.roba.match(/\d+(\.\d+)?/);
+        if (m) {
+            let b = parseFloat(m[0]);
+            if (tipVozila === "Teretnjak" && (zMala.includes("kg") || zMala.includes("kilogram"))) b = b / 1000;
+            trenutnoZauzeto += b;
+        }
+    });
+
+    const preostalo = maxNosivost - trenutnoZauzeto;
+    const procenat = maxNosivost > 0 ? Math.min(100, Math.round((trenutnoZauzeto / maxNosivost) * 100)) : 0;
+    let bojaStatusa = preostalo >= 0 ? "#34d399" : "#f87171";
+    let trakaBoja = preostalo >= 0 ? "#10b981" : "#ef4444";
+
+    kontejner.style.display = "block";
+    kontejner.innerHTML = `
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+                    <span>Kapacitet: <strong>${maxNosivost} ${jedinica}</strong></span>
+                    <span>Utovareno: <strong>${trenutnoZauzeto} ${jedinica}</strong> (${procenat}%)</span>
+                    <span style="color: ${bojaStatusa}; font-weight: 600;">Slobodno još: ${preostalo.toFixed(2)} ${jedinica}</span>
+                </div>
+                <div style="width: 100%; background: #1e293b; height: 8px; border-radius: 4px; overflow: hidden;">
+                    <div style="width: ${Math.min(procenat, 100)}%; background: ${trakaBoja}; height: 100%; transition: width 0.3s ease;"></div>
+                </div>
+            `;
+}
+
+function dodajPrivremeniZahtev() {
+    const voziloSelect = document.getElementById("izbor_vozila");
+    const kupacSelect = document.getElementById("izbor_kupca");
+    const roba = document.getElementById("opis_robe").value.trim();
+
+    if (!voziloSelect.value) return alert("Prvo izaberi vozilo!");
+    if (!kupacSelect.value || !roba) return alert("Izaberi kupca i unesi robu.");
+
+    const tipVozila = voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-tip");
+    const maksimalnaNosivost = parseFloat(voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-nosivost"));
+
+    const match = roba.match(/\d+(\.\d+)?/);
+    if (!match) return alert("Morate uneti količinu u brojevima (npr. '500 kg', '2 t' ili '1000 l').");
+    let unetiBroj = parseFloat(match[0]);
+    const robaMala = roba.toLowerCase();
+
+    if (tipVozila === "Cisterna" && (robaMala.includes("palet") || robaMala.includes("kutij") || robaMala.includes("kg") || robaMala.includes("ton"))) {
+        return alert("Greška: Cisterna prima isključivo tečnost u litrima!");
+    }
+    if (tipVozila === "Teretnjak" && (robaMala.includes("litar") || robaMala.includes("litara") || robaMala.includes(" lit"))) {
+        return alert("Greška: Tečnosti u litrima idu u cisternu!");
+    }
+
+    let kolicinaZaPoređenje = unetiBroj;
+    if (tipVozila === "Teretnjak" && (robaMala.includes("kg") || robaMala.includes("kilogram"))) {
+        kolicinaZaPoređenje = unetiBroj / 1000;
+    }
+
+    let trenutnoZauzeto = 0;
+    trenutniZahtevi.forEach(zahtev => {
+        const zMala = zahtev.roba.toLowerCase();
+        const m = zahtev.roba.match(/\d+(\.\d+)?/);
+        if (m) {
+            let b = parseFloat(m[0]);
+            if (tipVozila === "Teretnjak" && (zMala.includes("kg") || zMala.includes("kilogram"))) b = b / 1000;
+            trenutnoZauzeto += b;
+        }
+    });
+
+    if (trenutnoZauzeto + kolicinaZaPoređenje > maksimalnaNosivost) {
+        if (tipVozila === "Cisterna") return alert(` Prekoračenje kapaciteta cisterne!\nMax: ${maksimalnaNosivost} L.`);
+        else return alert(` Prekoračenje nosivosti teretnjaka!\nMax: ${maksimalnaNosivost} t.`);
+    }
+
+    trenutniZahtevi.push({
+        pib_kupca: kupacSelect.value,
+        naziv: kupacSelect.options[kupacSelect.selectedIndex].text,
+        roba: roba
+    });
+    osveziSpisakZahteva();
+    document.getElementById("opis_robe").value = "";
+}
+
+function osveziSpisakZahteva() {
+    const div = document.getElementById("spisak-dodatih-zahteva");
+    if (trenutniZahtevi.length === 0) {
+        div.innerHTML = '<span style="color: #64748b;">Nema dodatih zahteva u turu...</span>';
+    } else {
+        div.innerHTML = trenutniZahtevi.map((z) => `<div class="zahtev-stavka">📦 Zahtev: <strong>${z.naziv}</strong> - ${z.roba}</div>`).join('');
+    }
+    osveziPrikazKapaciteta();
+}
+
+async function lansirajTuru() {
+    if (trenutniZahtevi.length === 0) return alert("Dodajte barem jedan zahtev u turu!");
+    const tura = {
+        id_vozaca: parseInt(document.getElementById("izbor_vozaca").value),
+        registracija: document.getElementById("izbor_vozila").value,
+        datum: document.getElementById("datum_ture").value,
+        polaziste: document.getElementById("polaziste").value,
+        odrediste: document.getElementById("odrediste").value,
+        zahtevi: trenutniZahtevi
+    };
+    const odgovor = await fetch("/nova-tura", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(tura)
+    });
+    if (odgovor.ok) {
+        trenutniZahtevi = [];
+        osveziSpisakZahteva();
+        ucitajTure();
+        osveziKalendar();
+        osveziStatistiku();
+        alert("Tura je uspešno kreirana!");
+    } else {
+        const greska = await odgovor.json();
+        alert("Greška: " + greska.detail);
+    }
+}
+
+function getStatusBadge(status) {
+    if (status === "Završeno") return '<span class="status-btn status-zavrseno">● Završeno</span>';
+    if (status === "U toku") return '<span class="status-btn status-u-toku">● U toku</span>';
+    return '<span class="status-btn status-na-cekanju">● Na čekanju</span>';
+}
+
+async function ucitajTure() {
+    const odg = await fetch("/sve-ture");
+    const ture = await odg.json();
+    document.getElementById("tabela-tura").innerHTML = ture.map(t =>
+        `<tr>
+                    <td style="color: #3b82f6; font-weight: 500;">TR-${t.id + 2800}</td>
+                    <td>${t.vozac}</td>
+                    <td style="color: #94a3b8;">${t.vozilo}</td>
+                    <td style="color: #94a3b8;">📍 ${t.polaziste} ➔ ${t.odrediste}</td>
+                    <td style="color: #94a3b8;">${t.datum}</td>
+                    <td>${getStatusBadge(t.status)}</td>
+                    <td><button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button></td>
+                </tr>`
+    ).join('');
+}
+
+async function obrisiTuru(id) {
+    if (confirm("Obriši turu?")) {
+        await fetch(`/obrisi-turu/${id}`, {
+            method: "DELETE"
+        });
+        ucitajTure();
+        osveziKalendar();
+        osveziStatistiku();
+    }
+}
+
+/* Vozila */
+async function ucitajSvaVozila() {
+    const odg = await fetch("/sva-vozila");
+    const vozila = await odg.json();
+    document.getElementById("tabela-sva-vozila").innerHTML = vozila.map(v =>
+        `<tr><td><strong>${v.registracija}</strong></td><td>${v.marka}</td><td>${v.tip}</td><td>${v.nosivost} ${v.tip==='Cisterna'?'L':'t'}</td>
+                <td><button class="btn-zuto" onclick="izmeniVoziloPrompt('${v.registracija}', '${v.marka}', ${v.nosivost}, '${v.tip}')">Izmeni</button> 
+                <button class="btn-crveno" onclick="obrisiVozilo('${v.registracija}')">Obriši</button></td></tr>`
+    ).join('');
+}
+async function obrisiVozilo(reg) {
+    if (confirm(`Obriši vozilo ${reg}?`)) {
+        await fetch(`/obrisi-vozilo/${reg}`, {
+            method: "DELETE"
+        });
+        ucitajSvaVozila();
+        ucitajInicijalno();
+    }
+}
+async function izmeniVoziloPrompt(reg, marka, nosivost, tip) {
+    const novaMarka = prompt("Nova marka:", marka);
+    if (!novaMarka) return;
+    const novaNosivost = prompt("Nova nosivost/kapacitet:", nosivost);
+    if (!novaNosivost) return;
+    await fetch("/izmeni-vozilo", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            registracija: reg,
+            marka: novaMarka,
+            nosivost: parseFloat(novaNosivost),
+            tip: tip
+        })
+    });
+    ucitajSvaVozila();
+    ucitajInicijalno();
+}
+
+/* Vozaci */
+async function ucitajSveVozace() {
+    const odg = await fetch("/svi-vozaci");
+    const vozaci = await odg.json();
+    document.getElementById("tabela-svi-vozaci").innerHTML = vozaci.map(v =>
+        `<tr><td>#${v.id}</td><td><strong>${v.ime} ${v.prezime}</strong></td><td><code>${v.sifra}</code></td>
+                <td><button class="btn-zuto" onclick="izmeniSifruPrompt(${v.id}, '${v.sifra}')">Promeni šifru</button> 
+                <button class="btn-crveno" onclick="obrisiVozaca(${v.id})">Obriši</button></td></tr>`
+    ).join('');
+}
+async function obrisiVozaca(id) {
+    if (confirm(`Obriši vozača #${id}?`)) {
+        await fetch(`/obrisi-vozaca/${id}`, {
+            method: "DELETE"
+        });
+        ucitajSveVozace();
+        ucitajInicijalno();
+    }
+}
+async function izmeniSifruPrompt(id, staraSifra) {
+    const novaSifra = prompt("Unesite novu šifru za vozača:", staraSifra);
+    if (!novaSifra) return;
+    await fetch("/izmeni-sifru-vozaca", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            id_vozaca: id,
+            nova_sifra: novaSifra
+        })
+    });
+    ucitajSveVozace();
+}
+
+/* Kupci */
+async function ucitajSveKupce() {
+    const odg = await fetch("/svi-kupci");
+    const kupci = await odg.json();
+    document.getElementById("tabela-svi-kupci").innerHTML = kupci.map(k =>
+        `<tr><td><code>${k.pib}</code></td><td><strong>${k.naziv}</strong></td><td>${k.adresa}</td>
+                <td><button class="btn-zuto" onclick="izmeniKupcaPrompt('${k.pib}', '${k.naziv}', '${k.adresa}')">Izmeni</button> 
+                <button class="btn-crveno" onclick="obrisiKupca('${k.pib}')">Obriši</button></td></tr>`
+    ).join('');
+}
+async function obrisiKupca(pib) {
+    if (confirm(`Obriši kupca PIB: ${pib}?`)) {
+        await fetch(`/obrisi-kupca/${pib}`, {
+            method: "DELETE"
+        });
+        ucitajSveKupce();
+        ucitajInicijalno();
+    }
+}
+async function izmeniKupcaPrompt(pib, naziv, adresa) {
+    const noviNaziv = prompt("Novi naziv kompanije:", naziv);
+    if (!noviNaziv) return;
+    const novaAdresa = prompt("Nova adresa:", adresa);
+    if (!novaAdresa) return;
+    await fetch("/izmeni-kupca", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            pib: pib,
+            naziv: noviNaziv,
+            adresa: novaAdresa
+        })
+    });
+    ucitajSveKupce();
+    ucitajInicijalno();
+}
+
+/* Dodavanje */
+async function dodajKupca() {
+    const pib = document.getElementById("k_pib").value.trim();
+    const naziv = document.getElementById("k_naziv").value.trim();
+    const adresa = document.getElementById("k_adresa").value.trim();
+    if (!pib || !naziv || !adresa) return alert("Popunite sva polja!");
+    const odg = await fetch("/novi-kupac", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            pib: pib,
+            naziv: naziv,
+            adresa: adresa
+        })
+    });
+    if (odg.ok) {
+        alert("Kupac dodat!");
+        ucitajSveKupce();
+        ucitajInicijalno();
+        document.getElementById("k_pib").value = "";
+        document.getElementById("k_naziv").value = "";
+        document.getElementById("k_adresa").value = "";
+    }
+}
+
+async function dodajVozaca() {
+    const ime = document.getElementById("v_ime").value.trim();
+    const prezime = document.getElementById("v_prezime").value.trim();
+    const sifra = document.getElementById("v_sifra").value.trim();
+    if (!ime || !prezime || !sifra) return alert("Popunite sva polja!");
+    const odg = await fetch("/novi-vozac", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            ime: ime,
+            prezime: prezime,
+            sifra: sifra
+        })
+    });
+    if (odg.ok) {
+        alert("Vozač dodat!");
+        ucitajSveVozace();
+        ucitajInicijalno();
+        document.getElementById("v_ime").value = "";
+        document.getElementById("v_prezime").value = "";
+        document.getElementById("v_sifra").value = "";
+    }
+}
+
+async function dodajVozilo() {
+    const reg = document.getElementById("voz_reg").value.trim();
+    const marka = document.getElementById("voz_marka").value.trim();
+    const nosivost = document.getElementById("voz_nosivost").value;
+    const tip = document.getElementById("voz_tip").value;
+    if (!reg || !marka || !nosivost) return alert("Popunite sva polja!");
+    const odg = await fetch("/novo-vozilo", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            registracija: reg,
+            marka: marka,
+            nosivost: parseFloat(nosivost),
+            tip: tip
+        })
+    });
+    if (odg.ok) {
+        alert("Vozilo dodato!");
+        ucitajSvaVozila();
+        ucitajInicijalno();
+        document.getElementById("voz_reg").value = "";
+        document.getElementById("voz_marka").value = "";
+        document.getElementById("voz_nosivost").value = "";
+    }
+}
+
+ucitajInicijalno();
