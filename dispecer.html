@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eLogističar - Kontrolna tabla</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .tabela-skrol {
+            max-height: 270px;
+            overflow-y: auto;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            position: relative;
+        }
+
+        .tabela-skrol table {
+            border-collapse: separate !important;
+            border-spacing: 0 !important;
+            border: none !important;
+            width: 100%;
+        }
+
+        .tabela-skrol th {
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 100 !important;
+            background-color: #1e293b !important;
+            box-shadow: inset 0 -2px 0 #334155 !important;
+        }
+        * { box-sizing: border-box; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+        body { background-color: #0f172a; color: #e2e8f0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Meni */
+        .sidebar { width: 260px; background-color: #0b1120; border-right: 1px solid #1e293b; display: flex; flex-direction: column; padding: 20px 0; }
+        .logo { padding: 0 24px; font-size: 20px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 10px; margin-bottom: 40px; }
+        .logo-ikona { width: 32px; height: 32px; background-color: #3b82f6; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 18px; }
+        .nav-grupa { padding: 0 24px; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 10px; letter-spacing: 1px; text-transform: uppercase; }
+        .nav-item { padding: 12px 24px; color: #94a3b8; text-decoration: none; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; border-left: 3px solid transparent; transition: 0.2s; cursor: pointer; }
+        .nav-item:hover, .nav-item.active { background-color: rgba(59, 130, 246, 0.1); color: #ffffff; border-left-color: #3b82f6; }
+        .profil-dno { margin-top: auto; padding: 20px 24px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #1e293b; }
+        .profil-ikona { width: 36px; height: 36px; background-color: #d97706; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: 600; color: white; font-size: 14px; }
+        .profil-info { display: flex; flex-direction: column; }
+        .profil-ime { font-size: 14px; font-weight: 600; color: #f8fafc; }
+        .profil-rola { font-size: 12px; color: #64748b; }
+        
+        /* Sadrzaj */
+        .glavni-sadrzaj { flex: 1; padding: 30px 40px; overflow-y: auto; }
+        .zaglavlje-glavno { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+        .zaglavlje-tekst h1 { font-size: 24px; font-weight: 700; color: #ffffff; margin-bottom: 5px; }
+        .zaglavlje-tekst p { font-size: 14px; color: #94a3b8; }
+        
+        .zaglavlje-akcije { display: flex; align-items: center; gap: 16px; }
+        .pretraga-box { background: #0f172a; border: 1px solid #334155; padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 40px; color: #64748b; font-size: 14px; }
+        .pretraga-box kbd { background: #1e293b; padding: 2px 6px; border-radius: 4px; font-size: 12px; border: 1px solid #334155; }
+        .ikona-zvono { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .ikona-zvono:hover { background: #1e293b; color: white; }
+        .btn-novo-kreiranje { background-color: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .btn-novo-kreiranje:hover { background-color: #2563eb; }
+
+        /* Statistika */
+        .stat-kartice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
+        .stat-kartica { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .stat-naslov { color: #94a3b8; font-size: 14px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .stat-broj { font-size: 32px; font-weight: 700; color: #f8fafc; display: flex; align-items: baseline; gap: 10px; }
+        .stat-opis { font-size: 13px; font-weight: 500; }
+        .plavi-tekst { color: #3b82f6; }
+        .narancasti-tekst { color: #d97706; }
+        .zeleni-tekst { color: #10b981; }
+        .ikona-krug { width: 32px; height: 32px; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 16px; }
+        .bg-plava { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .bg-narancasta { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+        .bg-zelena { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+
+        .blok { background: #1e293b; padding: 24px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .blok-naslov { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .blok h3 { font-size: 16px; color: #f8fafc; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .badge-uzivo { background: rgba(16, 185, 129, 0.1); color: #10b981; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid #10b981; }
+        
+        /* Forme */
+        input, select { padding: 10px 12px; background-color: #0f172a; border: 1px solid #475569; border-radius: 6px; color: #f8fafc; font-size: 14px; outline: none; }
+        input:focus, select:focus { border-color: #3b82f6; }
+        .form-red { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+        button { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; }
+        .btn-zeleno { background-color: #10b981; color: white; }
+        .btn-zeleno:hover { background-color: #059669; }
+        .btn-sekundarno { background-color: #334155; color: #f8fafc; }
+        .btn-sekundarno:hover { background-color: #475569; }
+        .btn-crveno { background-color: #ef4444; color: white; padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+        .btn-zuto { background-color: #f59e0b; color: #0f172a; padding: 6px 12px; font-size: 12px; border-radius: 6px; font-weight: 700; }
+        .btn-zuto:hover { background-color: #d97706; }
+        .btn-odjava { background: transparent; border: none; color: #ef4444; font-size: 18px; cursor: pointer; margin-left: auto; padding: 5px; }
+        .btn-odjava:hover { color: #f87171; }
+        
+        /* Tabele */
+        .kalendar-nav { display: flex; gap: 10px; align-items: center; }
+        table { width: 100%; border-collapse: collapse; background: #0f172a; border-radius: 8px; overflow: hidden; border: 1px solid #334155; }
+        th, td { padding: 14px; text-align: left; border-bottom: 1px solid #334155; font-size: 13px; }
+        th { background-color: #1e293b; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+        tr:last-child td { border-bottom: none; }
+        
+        .zauzeto { background-color: rgba(239, 68, 68, 0.15); color: #fca5a5; font-weight: 600; text-align: center; border-left: 1px solid #334155; border-right: 1px solid #334155; }
+        .slobodno { background-color: rgba(16, 185, 129, 0.05); color: #34d399; text-align: center; border-left: 1px solid #334155; border-right: 1px solid #334155; }
+        
+        .status-btn { padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+        .status-u-toku { background: rgba(217, 119, 6, 0.2); color: #fbbf24; }
+        .status-na-cekanju { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .status-zavrseno { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        
+        .lista-zahteva { background: #0f172a; padding: 12px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 16px; font-size: 14px; min-height: 45px; }
+        .zahtev-stavka { padding: 6px 0; border-bottom: 1px dashed #334155; }
+        .zahtev-stavka:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+    <!-- Modal -->
+    <div id="modal-detalje-ture" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+        <div style="background: #1e293b; border: 1px solid #334155; border-radius: 12px; width: 420px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #334155; padding-bottom: 12px;">
+                <h3 style="color: #f8fafc; font-size: 16px;" id="modal-naslov-ture">Detalji vožnje</h3>
+                <button onclick="zatvoriModalTure()" style="background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer;">✕</button>
+            </div>
+            <div id="modal-sadrzaj-ture" style="font-size: 14px; color: #e2e8f0; display: flex; flex-direction: column; gap: 12px;">
+            </div>
+            <button class="btn-sekundarno" onclick="zatvoriModalTure()" style="width: 100%; margin-top: 20px;">Zatvori</button>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="logo">
+            <div class="logo-ikona">e</div>
+            eLogističar
+        </div>
+        <div class="nav-grupa">OPERACIJE</div>
+        <a class="nav-item active" onclick="promijeniTab('tab-kontrolna', this)">Kontrolna tabla</a>
+        <a class="nav-item" onclick="promijeniTab('tab-ture', this)">Ture</a>
+        <a class="nav-item" onclick="promijeniTab('tab-vozila', this)">Vozila</a>
+        <a class="nav-item" onclick="promijeniTab('tab-vozaci', this)">Vozači</a>
+        <a class="nav-item" onclick="promijeniTab('tab-kupci', this)">Kupci</a>
+        
+        <div class="profil-dno">
+            <div class="profil-ikona" id="profil-inicijali">?</div>
+            <div class="profil-info">
+                <span class="profil-ime" id="profil-ime-tekst">Učitavanje...</span>
+                <span class="profil-rola" id="profil-rola-tekst">Učitavanje...</span>
+            </div>
+            <button class="btn-odjava" onclick="odjaviSe()" title="Odjavi se">⏻</button>
+        </div>
+    </div>
+
+    <div class="glavni-sadrzaj">
+        <div class="zaglavlje-glavno">
+            <div class="zaglavlje-tekst">
+                <h1 id="naslov-stranice">Kontrolna tabla</h1>
+                <p id="tekst-datum">Pregled · učitavanje...</p>
+            </div>
+        
+        </div>
+
+        <!-- Tab 1 -->
+        <div id="tab-kontrolna" class="sadrzaj-taba">
+            <div class="stat-kartice">
+                <div class="stat-kartica">
+                    <div class="stat-naslov">Dostupna vozila <div class="ikona-krug bg-plava">🚚</div></div>
+                    <div class="stat-broj"><span id="stat-dostupna">0</span> <span class="stat-opis plavi-tekst" id="stat-ukupno">od 0 u floti</span></div>
+                </div>
+                <div class="stat-kartica">
+                    <div class="stat-naslov">Aktivne ture <div class="ikona-krug bg-narancasta">🛣️</div></div>
+                    <div class="stat-broj"><span id="stat-aktivne">0</span> <span class="stat-opis narancasti-tekst">nerealizovane</span></div>
+                </div>
+                <div class="stat-kartica">
+                    <div class="stat-naslov">Završeno danas <div class="ikona-krug bg-zelena">✓</div></div>
+                    <div class="stat-broj"><span id="stat-zavrseno">0</span> <span class="stat-opis zeleni-tekst">uspešno isporučeno</span></div>
+                </div>
+            </div>
+
+            <div class="blok">
+                <div class="blok-naslov">
+                    <h3>Pregled raspoloživosti vozila (7 dana)</h3>
+                    <div class="kalendar-nav">
+                        <button class="btn-sekundarno" onclick="pomeriKalendar(-7)">Prethodna nedelja</button>
+                        <button class="btn-sekundarno" onclick="pomeriKalendar(7)">Sledeća nedelja</button>
+                    </div>
+                </div>
+                <div class="tabela-skrol">
+                    <table>
+                        <thead>
+                            <tr id="kalendar-header"><th>Registracija vozila</th></tr>
+                        </thead>
+                        <tbody id="kalendar-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="blok">
+                <h3>Planiranje zbirnog transporta</h3>
+                <div class="form-red">
+                    <select id="izbor_vozaca"></select>
+                    <select id="izbor_vozila"></select>
+                    <input type="date" id="datum_ture">
+                    <input type="text" id="polaziste" placeholder="Polazište">
+                    <input type="text" id="odrediste" placeholder="Odredište">
+                </div>
+                
+                <div id="prikaz-popunjenosti" style="margin-bottom: 15px; padding: 12px; background: #0f172a; border-radius: 8px; border: 1px solid #334155; display: none;"></div>
+
+                <h4 style="font-size: 14px; margin-bottom: 10px; color: #94a3b8;">Dodaj zahteve kupaca u ovaj kamion:</h4>
+                <div class="form-red">
+                    <select id="izbor_kupca"></select>
+                    <input type="text" id="opis_robe" placeholder="Opis robe">
+                    <button class="btn-sekundarno" onclick="dodajPrivremeniZahtev()">Dodaj zahtev u kamion</button>
+                </div>
+                
+                <div class="lista-zahteva" id="spisak-dodatih-zahteva">
+                    <span style="color: #64748b;">Nema dodatih zahteva u turu...</span>
+                </div>
+
+                <button class="btn-zeleno" onclick="lansirajTuru()" style="background-color: #3b82f6;">Kreiraj novu turu</button>
+            </div>
+
+            <div class="blok">
+                <div class="blok-naslov">
+                    <h3>Aktivne ture <span class="badge-uzivo">● UŽIVO</span></h3>
+                </div>
+                <table>
+                    <thead><tr><th>ID Ture</th><th>Vozač</th><th>Vozilo</th><th>Relacija</th><th>Datum</th><th>Status</th><th>Akcija</th></tr></thead>
+                    <tbody id="tabela-tura"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 2 -->
+        <div id="tab-ture" class="sadrzaj-taba" style="display: none;">
+            <div class="blok">
+                <div class="blok-naslov">
+                    <h3>Arhiva svih tura</h3>
+                    <button class="btn-sekundarno" onclick="resetujFiltereTura()" style="font-size: 12px;">Poništi filtere</button>
+                </div>
+                
+                <div class="form-red" style="margin-bottom: 20px; align-items: center;">
+                    <input type="text" id="filter-pretraga" placeholder="Pretraži vozača, vozilo ili grad..." onkeyup="filtrirajArhivu()" style="flex: 1; min-width: 250px;">
+                    <select id="filter-status" onchange="filtrirajArhivu()" style="min-width: 150px;">
+                        <option value="">Svi statusi</option>
+                        <option value="Završeno">Završeno</option>
+                        <option value="U toku">U toku</option>
+                        <option value="Na čekanju">Na čekanju</option>
+                    </select>
+                    <input type="date" id="filter-datum" onchange="filtrirajArhivu()" style="padding: 10px 12px; background-color: #0f172a; border: 1px solid #475569; border-radius: 6px; color: #f8fafc; outline: none;">
+                </div>
+
+                <div class="tabela-skrol" style="max-height: 500px;">
+                    <table>
+                        <thead>
+                            <tr><th>ID Ture</th><th>Vozač</th><th>Vozilo</th><th>Relacija</th><th>Datum</th><th>Status</th><th>Akcija</th></tr>
+                        </thead>
+                        <tbody id="tabela-arhiva-tura"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3 -->
+        <div id="tab-vozila" class="sadrzaj-taba" style="display: none;">
+            <div class="blok">
+                <h3>Dodaj novo vozilo u bazu</h3>
+                <div class="form-red">
+                    <input type="text" id="voz_reg" placeholder="Registracija (npr. BG-123-AB)">
+                    <input type="text" id="voz_marka" placeholder="Marka (npr. Volvo)">
+                    <select id="voz_tip" onchange="document.getElementById('voz_nosivost').placeholder = this.value === 'Cisterna' ? 'Kapacitet (litara)' : 'Nosivost (tona)'">
+                        <option value="Teretnjak">Teretnjak</option>
+                        <option value="Cisterna">Cisterna</option>
+                    </select>
+                    <input type="number" id="voz_nosivost" placeholder="Nosivost (tona)">
+                    <button class="btn-zeleno" onclick="dodajVozilo()">Sačuvaj vozilo</button>
+                </div>
+            </div>
+            
+            <div class="blok">
+                <h3>Spisak svih vozila</h3>
+                <table>
+                    <thead><tr><th>Registracija</th><th>Marka</th><th>Tip</th><th>Nosivost / Kapacitet</th><th>Akcije</th></tr></thead>
+                    <tbody id="tabela-sva-vozila"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 4 -->
+        <div id="tab-vozaci" class="sadrzaj-taba" style="display: none;">
+            <div class="blok">
+                <h3>Registracija novog vozača</h3>
+                <div class="form-red">
+                    <input type="text" id="v_ime" placeholder="Ime">
+                    <input type="text" id="v_prezime" placeholder="Prezime">
+                    <input type="text" id="v_sifra" placeholder="Šifra (za prijavu)">
+                    <button class="btn-zeleno" onclick="dodajVozaca()">Sačuvaj vozača</button>
+                </div>
+            </div>
+
+            <div class="blok">
+                <h3>Spisak registrovanih vozača</h3>
+                <table>
+                    <thead><tr><th>ID</th><th>Ime i Prezime</th><th>Trenutna šifra</th><th>Akcije</th></tr></thead>
+                    <tbody id="tabela-svi-vozaci"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 5 -->
+        <div id="tab-kupci" class="sadrzaj-taba" style="display: none;">
+            <div class="blok">
+                <h3>Evidencija novog kupca</h3>
+                <div class="form-red">
+                    <input type="text" id="k_pib" placeholder="PIB kompanije">
+                    <input type="text" id="k_naziv" placeholder="Naziv kompanije">
+                    <input type="text" id="k_adresa" placeholder="Sedište/Adresa">
+                    <button class="btn-zeleno" onclick="dodajKupca()">Sačuvaj kupca</button>
+                </div>
+            </div>
+
+            <div class="blok">
+                <h3>Spisak svih kupaca</h3>
+                <table>
+                    <thead><tr><th>PIB</th><th>Naziv Kompanije</th><th>Adresa</th><th>Akcije</th></tr></thead>
+                    <tbody id="tabela-svi-kupci"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let trenutniZahtevi = [];
+        let prikazaniDatumKalendara = new Date();
+        let mapaTuraZaKalendar = {};
+        let sveTurePodaci = [];
+
+        document.getElementById("izbor_vozila").addEventListener("change", function() {
+            const tip = this.options[this.selectedIndex].getAttribute("data-tip");
+            const opisInput = document.getElementById("opis_robe");
+            if (tip === "Cisterna") {
+                opisInput.placeholder = "Unesi tečnost (npr. 5000 litara)";
+            } else if (tip === "Teretnjak") {
+                opisInput.placeholder = "Opis robe (npr. 2 palete ili 500 kg)";
+            } else {
+                opisInput.placeholder = "Opis robe";
+            }
+            osveziPrikazKapaciteta();
+        });
+
+        function promijeniTab(idTaba, element) {
+            document.querySelectorAll('.sadrzaj-taba').forEach(tab => tab.style.display = 'none');
+            document.querySelectorAll('.nav-item').forEach(link => link.classList.remove('active'));
+            
+            document.getElementById(idTaba).style.display = 'block';
+            element.classList.add('active');
+            document.getElementById('naslov-stranice').innerText = element.innerText;
+
+            if (idTaba === 'tab-vozila') ucitajSvaVozila();
+            if (idTaba === 'tab-vozaci') ucitajSveVozace();
+            if (idTaba === 'tab-kupci') ucitajSveKupce();
+            if (idTaba === 'tab-ture') ucitajArhivuTura();
+        }
+
+        function postaviPodatkeKorisnika() {
+            const ime = localStorage.getItem("korisnik_ime") || "Nepoznat";
+            const prezime = localStorage.getItem("korisnik_prezime") || "Korisnik";
+            const rola = localStorage.getItem("korisnik_rola") || "Dispečer";
+            
+            document.getElementById("profil-ime-tekst").innerText = `${ime} ${prezime}`;
+            document.getElementById("profil-rola-tekst").innerText = rola;
+            document.getElementById("profil-inicijali").innerText = ime.charAt(0) + prezime.charAt(0);
+        }
+
+        function postaviDanasnjiDatum() {
+            const opcije = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const danasnjiTekst = new Date().toLocaleDateString('sr-RS', opcije);
+            document.getElementById("tekst-datum").innerText = "Pregled · " + danasnjiTekst;
+        }
+
+        function odjaviSe() {
+            localStorage.clear();
+            window.location.href = "/";
+        }
+
+        function formatirajDatumZaAPI(datum) {
+            return datum.toISOString().split('T')[0];
+        }
+
+        async function osveziStatistiku() {
+            try {
+                const odg = await fetch("/statistika");
+                const stat = await odg.json();
+                document.getElementById("stat-dostupna").innerText = stat.dostupna_vozila;
+                document.getElementById("stat-ukupno").innerText = `od ${stat.ukupno_vozila} u floti`;
+                document.getElementById("stat-aktivne").innerText = stat.aktivne_ture;
+                document.getElementById("stat-zavrseno").innerText = stat.zavrseno_danas;
+            } catch (err) { console.error("Greška statistike", err); }
+        }
+
+        async function ucitajArhivuTura() {
+            try {
+                const odg = await fetch("/sve-ture"); 
+                sveTurePodaci = await odg.json();
+                renderArhivaTura(sveTurePodaci);
+            } catch (err) {
+                console.error("Greška pri učitavanju arhive tura", err);
+            }
+        }
+
+        function renderArhivaTura(ture) {
+            const tbody = document.getElementById("tabela-arhiva-tura");
+            if (ture.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b; padding: 20px;">Nema pronađenih tura za zadane filtere.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = ture.map(t => 
+                `<tr>
+                    <td style="color: #3b82f6; font-weight: 500;">TR-${t.id + 2800}</td>
+                    <td>${t.vozac}</td>
+                    <td style="color: #94a3b8;">${t.vozilo}</td>
+                    <td style="color: #94a3b8;">📍 ${t.polaziste} ➔ ${t.odrediste}</td>
+                    <td style="color: #94a3b8;">${t.datum}</td>
+                    <td>${getStatusBadge(t.status)}</td>
+                    <td><button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button></td>
+                </tr>`
+            ).join('');
+        }
+
+        function filtrirajArhivu() {
+            const pretraga = document.getElementById("filter-pretraga").value.toLowerCase();
+            const status = document.getElementById("filter-status").value;
+            const datum = document.getElementById("filter-datum").value;
+
+            const filtrirano = sveTurePodaci.filter(t => {
+                const matchPretraga = (t.vozac && t.vozac.toLowerCase().includes(pretraga)) ||
+                                      (t.vozilo && t.vozilo.toLowerCase().includes(pretraga)) ||
+                                      (t.polaziste && t.polaziste.toLowerCase().includes(pretraga)) ||
+                                      (t.odrediste && t.odrediste.toLowerCase().includes(pretraga));
+                
+                const matchStatus = status === "" || t.status === status;
+                
+                const matchDatum = datum === "" || (t.datum && t.datum.includes(datum));
+
+                return matchPretraga && matchStatus && matchDatum;
+            });
+
+            renderArhivaTura(filtrirano);
+        }
+
+        function resetujFiltereTura() {
+            document.getElementById("filter-pretraga").value = "";
+            document.getElementById("filter-status").value = "";
+            document.getElementById("filter-datum").value = "";
+            renderArhivaTura(sveTurePodaci);
+        }
+
+        async function ucitajInicijalno() {
+            postaviPodatkeKorisnika(); 
+            postaviDanasnjiDatum();
+            
+            const odg = await fetch("/podaci-za-dispecera"); 
+            const p = await odg.json();
+            
+            document.getElementById("izbor_kupca").innerHTML = '<option value="">Izaberi kupca...</option>' + p.kupci.map(k => `<option value="${k.pib}">${k.naziv}</option>`).join('');
+            document.getElementById("izbor_vozaca").innerHTML = '<option value="">Izaberi vozača...</option>' + p.vozaci.map(v => `<option value="${v.id}">${v.ime}</option>`).join('');
+            
+            document.getElementById("izbor_vozila").innerHTML = '<option value="" data-tip="" data-nosivost="0">Izaberi vozilo...</option>' + p.vozila.map(v => {
+                const jedinica = v.tip === "Cisterna" ? "L" : "t";
+                return `<option value="${v.registracija}" data-tip="${v.tip}" data-nosivost="${v.nosivost}">${v.registracija} (${v.marka} - Max: ${v.nosivost} ${jedinica})</option>`;
+            }).join('');
+            
+            document.getElementById('datum_ture').valueAsDate = new Date();
+            
+            osveziKalendar();
+            ucitajTure();
+            osveziStatistiku();
+        }
+
+        function pomeriKalendar(dani) {
+            prikazaniDatumKalendara.setDate(prikazaniDatumKalendara.getDate() + dani);
+            osveziKalendar();
+        }
+
+        async function osveziKalendar() {
+            const datumParam = formatirajDatumZaAPI(prikazaniDatumKalendara);
+            const odg = await fetch(`/sedmicni-pregled?pocetni_datum=${datumParam}`);
+            const podaci = await odg.json();
+            
+            mapaTuraZaKalendar = {}; 
+            
+            let header = "<th>Registracija vozila</th>";
+            podaci.dani.forEach(d => header += `<th>${d}</th>`);
+            document.getElementById("kalendar-header").innerHTML = header;
+            
+            let html = "";
+            for (const [reg, daniObj] of Object.entries(podaci.zauzece)) {
+                const info = podaci.detalji_vozila[reg] || { tip: "Teretnjak", nosivost: 0 };
+                const jedinica = info.tip === "Cisterna" ? "L" : "t";
+                
+                html += `<tr><td><strong>${reg}</strong><br><span style="font-size:11px; color:#94a3b8;">${info.tip} (${info.nosivost} ${jedinica})</span></td>`;
+                podaci.dani.forEach(d => {
+                    const turaInfo = daniObj[d];
+                    if (turaInfo && typeof turaInfo === 'object' && turaInfo.status !== "Završeno") {
+                        const kljuc = `${reg}_${d}`;
+                        mapaTuraZaKalendar[kljuc] = turaInfo;
+                        
+                        html += `<td class="zauzeto" onclick="otvoriModalTure('${kljuc}', '${reg}', '${d}')" style="cursor: pointer;" title="Klikni za detalje">
+                                    Zauzeto<br><span style="font-size:10px; font-weight: normal; color:#f87171;">(${turaInfo.status})</span>
+                                 </td>`;
+                    } else if (typeof turaInfo === 'string' && turaInfo !== "Završeno") {
+                        html += `<td class="zauzeto">Zauzeto<br><span style="font-size:10px; font-weight: normal; color:#f87171;">(${turaInfo})</span></td>`;
+                    } else {
+                        html += `<td class="slobodno">Slobodno</td>`;
+                    }
+                });
+                html += `</tr>`;
+            }
+            document.getElementById("kalendar-body").innerHTML = html;
+        }
+
+        function otvoriModalTure(kljuc, reg, datum) {
+            const tura = mapaTuraZaKalendar[kljuc];
+            if (!tura) return;
+            
+            document.getElementById("modal-naslov-ture").innerText = `Tura TR-${tura.id + 2800} (${reg})`;
+            
+            let robaHtml = tura.roba && tura.roba.length > 0 
+                ? tura.roba.map(r => `<li style="margin-left:15px;">${r}</li>`).join('') 
+                : "<i>Nema detalja o robi</i>";
+                
+            document.getElementById("modal-sadrzaj-ture").innerHTML = `
+                <div><strong style="color:#94a3b8;">Datum:</strong> ${datum}</div>
+                <div><strong style="color:#94a3b8;">Vozač:</strong> ${tura.vozac}</div>
+                <div><strong style="color:#94a3b8;">Relacija:</strong>  ${tura.polaziste} ➔ ${tura.odrediste}</div>
+                <div><strong style="color:#94a3b8;">Status:</strong> <span style="color:#fbbf24;">${tura.status}</span></div>
+                <div style="border-top: 1px dashed #334155; padding-top: 8px; margin-top: 4px;">
+                    <strong style="color:#94a3b8;">Utovareni teret:</strong>
+                    <ul style="margin-top: 4px; color: #38bdf8;">${robaHtml}</ul>
+                </div>
+            `;
+            
+            document.getElementById("modal-detalje-ture").style.display = "flex";
+        }
+
+        function zatvoriModalTure() {
+            document.getElementById("modal-detalje-ture").style.display = "none";
+        }
+
+        function osveziPrikazKapaciteta() {
+            const voziloSelect = document.getElementById("izbor_vozila");
+            const kontejner = document.getElementById("prikaz-popunjenosti");
+            
+            if (!voziloSelect.value) { kontejner.style.display = "none"; return; }
+            
+            const tipVozila = voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-tip");
+            const maxNosivost = parseFloat(voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-nosivost")) || 0;
+            const jedinica = tipVozila === "Cisterna" ? "L" : "t";
+            
+            let trenutnoZauzeto = 0;
+            trenutniZahtevi.forEach(zahtev => {
+                const zMala = zahtev.roba.toLowerCase();
+                const m = zahtev.roba.match(/\d+(\.\d+)?/);
+                if (m) {
+                    let b = parseFloat(m[0]);
+                    if (tipVozila === "Teretnjak" && (zMala.includes("kg") || zMala.includes("kilogram"))) b = b / 1000;
+                    trenutnoZauzeto += b;
+                }
+            });
+            
+            const preostalo = maxNosivost - trenutnoZauzeto;
+            const procenat = maxNosivost > 0 ? Math.min(100, Math.round((trenutnoZauzeto / maxNosivost) * 100)) : 0;
+            let bojaStatusa = preostalo >= 0 ? "#34d399" : "#f87171";
+            let trakaBoja = preostalo >= 0 ? "#10b981" : "#ef4444";
+            
+            kontejner.style.display = "block";
+            kontejner.innerHTML = `
+                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+                    <span>Kapacitet: <strong>${maxNosivost} ${jedinica}</strong></span>
+                    <span>Utovareno: <strong>${trenutnoZauzeto} ${jedinica}</strong> (${procenat}%)</span>
+                    <span style="color: ${bojaStatusa}; font-weight: 600;">Slobodno još: ${preostalo.toFixed(2)} ${jedinica}</span>
+                </div>
+                <div style="width: 100%; background: #1e293b; height: 8px; border-radius: 4px; overflow: hidden;">
+                    <div style="width: ${Math.min(procenat, 100)}%; background: ${trakaBoja}; height: 100%; transition: width 0.3s ease;"></div>
+                </div>
+            `;
+        }
+
+        function dodajPrivremeniZahtev() {
+            const voziloSelect = document.getElementById("izbor_vozila");
+            const kupacSelect = document.getElementById("izbor_kupca");
+            const roba = document.getElementById("opis_robe").value.trim();
+            
+            if (!voziloSelect.value) return alert("Prvo izaberi vozilo!");
+            if (!kupacSelect.value || !roba) return alert("Izaberi kupca i unesi robu.");
+            
+            const tipVozila = voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-tip");
+            const maksimalnaNosivost = parseFloat(voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-nosivost"));
+            
+            const match = roba.match(/\d+(\.\d+)?/);
+            if (!match) return alert("Morate uneti količinu u brojevima (npr. '500 kg', '2 t' ili '1000 l').");
+            let unetiBroj = parseFloat(match[0]);
+            const robaMala = roba.toLowerCase();
+
+            if (tipVozila === "Cisterna" && (robaMala.includes("palet") || robaMala.includes("kutij") || robaMala.includes("kg") || robaMala.includes("ton"))) {
+                return alert("Greška: Cisterna prima isključivo tečnost u litrima!");
+            }
+            if (tipVozila === "Teretnjak" && (robaMala.includes("litar") || robaMala.includes("litara") || robaMala.includes(" lit"))) {
+                return alert("Greška: Tečnosti u litrima idu u cisternu!");
+            }
+
+            let kolicinaZaPoređenje = unetiBroj;
+            if (tipVozila === "Teretnjak" && (robaMala.includes("kg") || robaMala.includes("kilogram"))) {
+                kolicinaZaPoređenje = unetiBroj / 1000;
+            }
+
+            let trenutnoZauzeto = 0;
+            trenutniZahtevi.forEach(zahtev => {
+                const zMala = zahtev.roba.toLowerCase();
+                const m = zahtev.roba.match(/\d+(\.\d+)?/);
+                if (m) {
+                    let b = parseFloat(m[0]);
+                    if (tipVozila === "Teretnjak" && (zMala.includes("kg") || zMala.includes("kilogram"))) b = b / 1000;
+                    trenutnoZauzeto += b;
+                }
+            });
+
+            if (trenutnoZauzeto + kolicinaZaPoređenje > maksimalnaNosivost) {
+                if (tipVozila === "Cisterna") return alert(` Prekoračenje kapaciteta cisterne!\nMax: ${maksimalnaNosivost} L.`);
+                else return alert(` Prekoračenje nosivosti teretnjaka!\nMax: ${maksimalnaNosivost} t.`);
+            }
+
+            trenutniZahtevi.push({ pib_kupca: kupacSelect.value, naziv: kupacSelect.options[kupacSelect.selectedIndex].text, roba: roba });
+            osveziSpisakZahteva();
+            document.getElementById("opis_robe").value = "";
+        }
+
+        function osveziSpisakZahteva() {
+            const div = document.getElementById("spisak-dodatih-zahteva");
+            if(trenutniZahtevi.length === 0) { div.innerHTML = '<span style="color: #64748b;">Nema dodatih zahteva u turu...</span>'; }
+            else { div.innerHTML = trenutniZahtevi.map((z) => `<div class="zahtev-stavka">📦 Zahtev: <strong>${z.naziv}</strong> - ${z.roba}</div>`).join(''); }
+            osveziPrikazKapaciteta();
+        }
+
+        async function lansirajTuru() {
+            if(trenutniZahtevi.length === 0) return alert("Dodajte barem jedan zahtev u turu!");
+            const tura = { id_vozaca: parseInt(document.getElementById("izbor_vozaca").value), registracija: document.getElementById("izbor_vozila").value, datum: document.getElementById("datum_ture").value, polaziste: document.getElementById("polaziste").value, odrediste: document.getElementById("odrediste").value, zahtevi: trenutniZahtevi };
+            const odgovor = await fetch("/nova-tura", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(tura) });
+            if (odgovor.ok) { trenutniZahtevi = []; osveziSpisakZahteva(); ucitajTure(); osveziKalendar(); osveziStatistiku(); alert("Tura je uspešno kreirana!"); } 
+            else { const greska = await odgovor.json(); alert("Greška: " + greska.detail); }
+        }
+
+        function getStatusBadge(status) {
+            if (status === "Završeno") return '<span class="status-btn status-zavrseno">● Završeno</span>';
+            if (status === "U toku") return '<span class="status-btn status-u-toku">● U toku</span>';
+            return '<span class="status-btn status-na-cekanju">● Na čekanju</span>';
+        }
+
+        async function ucitajTure() {
+            const odg = await fetch("/sve-ture"); 
+            const ture = await odg.json();
+            document.getElementById("tabela-tura").innerHTML = ture.map(t => 
+                `<tr>
+                    <td style="color: #3b82f6; font-weight: 500;">TR-${t.id + 2800}</td>
+                    <td>${t.vozac}</td>
+                    <td style="color: #94a3b8;">${t.vozilo}</td>
+                    <td style="color: #94a3b8;">📍 ${t.polaziste} ➔ ${t.odrediste}</td>
+                    <td style="color: #94a3b8;">${t.datum}</td>
+                    <td>${getStatusBadge(t.status)}</td>
+                    <td><button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button></td>
+                </tr>`
+            ).join('');
+        }
+
+        async function obrisiTuru(id) {
+            if(confirm("Obriši turu?")) { await fetch(`/obrisi-turu/${id}`, {method: "DELETE"}); ucitajTure(); osveziKalendar(); osveziStatistiku(); }
+        }
+
+        /* Vozila */
+        async function ucitajSvaVozila() {
+            const odg = await fetch("/sva-vozila"); const vozila = await odg.json();
+            document.getElementById("tabela-sva-vozila").innerHTML = vozila.map(v => 
+                `<tr><td><strong>${v.registracija}</strong></td><td>${v.marka}</td><td>${v.tip}</td><td>${v.nosivost} ${v.tip==='Cisterna'?'L':'t'}</td>
+                <td><button class="btn-zuto" onclick="izmeniVoziloPrompt('${v.registracija}', '${v.marka}', ${v.nosivost}, '${v.tip}')">Izmeni</button> 
+                <button class="btn-crveno" onclick="obrisiVozilo('${v.registracija}')">Obriši</button></td></tr>`
+            ).join('');
+        }
+        async function obrisiVozilo(reg) {
+            if(confirm(`Obriši vozilo ${reg}?`)) { await fetch(`/obrisi-vozilo/${reg}`, {method: "DELETE"}); ucitajSvaVozila(); ucitajInicijalno(); }
+        }
+        async function izmeniVoziloPrompt(reg, marka, nosivost, tip) {
+            const novaMarka = prompt("Nova marka:", marka); if(!novaMarka) return;
+            const novaNosivost = prompt("Nova nosivost/kapacitet:", nosivost); if(!novaNosivost) return;
+            await fetch("/izmeni-vozilo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ registracija: reg, marka: novaMarka, nosivost: parseFloat(novaNosivost), tip: tip }) });
+            ucitajSvaVozila(); ucitajInicijalno();
+        }
+
+        /* Vozaci */
+        async function ucitajSveVozace() {
+            const odg = await fetch("/svi-vozaci"); const vozaci = await odg.json();
+            document.getElementById("tabela-svi-vozaci").innerHTML = vozaci.map(v => 
+                `<tr><td>#${v.id}</td><td><strong>${v.ime} ${v.prezime}</strong></td><td><code>${v.sifra}</code></td>
+                <td><button class="btn-zuto" onclick="izmeniSifruPrompt(${v.id}, '${v.sifra}')">Promeni šifru</button> 
+                <button class="btn-crveno" onclick="obrisiVozaca(${v.id})">Obriši</button></td></tr>`
+            ).join('');
+        }
+        async function obrisiVozaca(id) {
+            if(confirm(`Obriši vozača #${id}?`)) { await fetch(`/obrisi-vozaca/${id}`, {method: "DELETE"}); ucitajSveVozace(); ucitajInicijalno(); }
+        }
+        async function izmeniSifruPrompt(id, staraSifra) {
+            const novaSifra = prompt("Unesite novu šifru za vozača:", staraSifra); if(!novaSifra) return;
+            await fetch("/izmeni-sifru-vozaca", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id_vozaca: id, nova_sifra: novaSifra }) });
+            ucitajSveVozace();
+        }
+
+        /* Kupci */
+        async function ucitajSveKupce() {
+            const odg = await fetch("/svi-kupci"); const kupci = await odg.json();
+            document.getElementById("tabela-svi-kupci").innerHTML = kupci.map(k => 
+                `<tr><td><code>${k.pib}</code></td><td><strong>${k.naziv}</strong></td><td>${k.adresa}</td>
+                <td><button class="btn-zuto" onclick="izmeniKupcaPrompt('${k.pib}', '${k.naziv}', '${k.adresa}')">Izmeni</button> 
+                <button class="btn-crveno" onclick="obrisiKupca('${k.pib}')">Obriši</button></td></tr>`
+            ).join('');
+        }
+        async function obrisiKupca(pib) {
+            if(confirm(`Obriši kupca PIB: ${pib}?`)) { await fetch(`/obrisi-kupca/${pib}`, {method: "DELETE"}); ucitajSveKupce(); ucitajInicijalno(); }
+        }
+        async function izmeniKupcaPrompt(pib, naziv, adresa) {
+            const noviNaziv = prompt("Novi naziv kompanije:", naziv); if(!noviNaziv) return;
+            const novaAdresa = prompt("Nova adresa:", adresa); if(!novaAdresa) return;
+            await fetch("/izmeni-kupca", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pib: pib, naziv: noviNaziv, adresa: novaAdresa }) });
+            ucitajSveKupce(); ucitajInicijalno();
+        }
+
+        /* Dodavanje */
+        async function dodajKupca() {
+            const pib = document.getElementById("k_pib").value.trim(); const naziv = document.getElementById("k_naziv").value.trim(); const adresa = document.getElementById("k_adresa").value.trim();
+            if (!pib || !naziv || !adresa) return alert("Popunite sva polja!");
+            const odg = await fetch("/novi-kupac", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pib: pib, naziv: naziv, adresa: adresa }) });
+            if (odg.ok) { alert("Kupac dodat!"); ucitajSveKupce(); ucitajInicijalno(); document.getElementById("k_pib").value=""; document.getElementById("k_naziv").value=""; document.getElementById("k_adresa").value=""; }
+        }
+
+        async function dodajVozaca() {
+            const ime = document.getElementById("v_ime").value.trim(); const prezime = document.getElementById("v_prezime").value.trim(); const sifra = document.getElementById("v_sifra").value.trim();
+            if (!ime || !prezime || !sifra) return alert("Popunite sva polja!");
+            const odg = await fetch("/novi-vozac", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ime: ime, prezime: prezime, sifra: sifra }) });
+            if (odg.ok) { alert("Vozač dodat!"); ucitajSveVozace(); ucitajInicijalno(); document.getElementById("v_ime").value=""; document.getElementById("v_prezime").value=""; document.getElementById("v_sifra").value=""; }
+        }
+
+        async function dodajVozilo() {
+            const reg = document.getElementById("voz_reg").value.trim(); const marka = document.getElementById("voz_marka").value.trim(); const nosivost = document.getElementById("voz_nosivost").value; const tip = document.getElementById("voz_tip").value;
+            if (!reg || !marka || !nosivost) return alert("Popunite sva polja!");
+            const odg = await fetch("/novo-vozilo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ registracija: reg, marka: marka, nosivost: parseFloat(nosivost), tip: tip }) });
+            if (odg.ok) { alert("Vozilo dodato!"); ucitajSvaVozila(); ucitajInicijalno(); document.getElementById("voz_reg").value=""; document.getElementById("voz_marka").value=""; document.getElementById("voz_nosivost").value=""; }
+        }
+
+        ucitajInicijalno();
+    </script>
+</body>
+</html>

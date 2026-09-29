@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eLogističar - Vozač</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: #0f172a; padding: 20px 40px; margin: 0; color: #e2e8f0; }
+        .zaglavlje { background-color: #1e293b; border: 1px solid #334155; border-left: 5px solid #10b981; padding: 20px 30px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+        .zaglavlje h2 { margin: 0; font-size: 22px; font-weight: 700; color: #f8fafc; }
+        a.odjava-btn { color: #f8fafc; text-decoration: none; font-weight: 500; background: #334155; padding: 8px 16px; border-radius: 6px; transition: background 0.2s; }
+        a.odjava-btn:hover { background: #475569; }
+        
+        .tabela-zaglavlje { display: flex; justify-content: space-between; align-items: center; margin-top: 40px; margin-bottom: 15px; }
+        .tabela-zaglavlje h3 { margin: 0; font-size: 20px; color: #f8fafc; }
+        .filter-meni { padding: 10px 14px; background-color: #1e293b; border: 1px solid #475569; border-radius: 8px; font-weight: 500; font-size: 14px; color: #f8fafc; outline: none; }
+        
+        table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 12px; overflow: hidden; border: 1px solid #334155; }
+        th, td { padding: 16px; text-align: left; border-bottom: 1px solid #334155; font-size: 14px; }
+        th { background-color: #0f172a; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; font-size: 12px; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background-color: #334155; }
+        
+        .status-badge { padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; display: inline-block; }
+        .btn-start { background-color: #f59e0b; color: #1e293b; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; transition: 0.2s; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.3); }
+        .btn-start:hover { background-color: #d97706; }
+        .btn-kraj { background-color: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; transition: 0.2s; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3); }
+        .btn-kraj:hover { background-color: #2563eb; }
+        .gotovo-tekst { color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 8px; }
+    </style>
+</head>
+<body>
+    <div class="zaglavlje">
+        <h2>Aktivne ture - Moja tabla</h2>
+        <a href="/" class="odjava-btn" onclick="localStorage.clear()">Odjavi se</a>
+    </div>
+    
+    <div class="tabela-zaglavlje">
+        <h3>Ture za realizaciju</h3>
+        <select id="filter_status" class="filter-meni" onchange="ucitajTure()">
+            <option value="Sve">Prikaži sve moje ture</option>
+            <option value="Aktivne" selected>Samo aktivne</option>
+            <option value="Završeno">Samo završene</option>
+        </select>
+    </div>
+    
+    <table>
+        <thead><tr><th>ID</th><th>Kupac</th><th>Vozilo</th><th>Polazište</th><th>Odredište</th><th>Status</th><th>Akcije</th></tr></thead>
+        <tbody id="tabela-tura"></tbody>
+    </table>
+
+    <script>
+        const MOJ_ID = localStorage.getItem("korisnik_id");
+
+        function formatirajStatus(status) {
+            let bojaBg = status === "Završeno" ? "rgba(16, 185, 129, 0.2)" : status === "U toku" ? "rgba(245, 158, 11, 0.2)" : "rgba(100, 116, 139, 0.2)";
+            let bojaTxt = status === "Završeno" ? "#34d399" : status === "U toku" ? "#fbbf24" : "#94a3b8";
+            let ikona = status === "Završeno" ? "✔ " : status === "U toku" ? "▶ " : "⏳ ";
+            return `<span class="status-badge" style="background:${bojaBg}; color:${bojaTxt}; border: 1px solid ${bojaTxt}40;">${ikona}${status}</span>`;
+        }
+
+        async function ucitajTure() {
+            if (!MOJ_ID) return alert("Greška: ID nije pronađen. Molimo ulogujte se ponovo.");
+            
+            const odgovor = await fetch(`/ture-vozaca/${MOJ_ID}`);
+            const ture = await odgovor.json();
+            const filter = document.getElementById("filter_status").value;
+            const tabela = document.getElementById("tabela-tura"); tabela.innerHTML = "";
+            
+            ture.forEach(t => {
+                if (filter === "Aktivne" && t.status === "Završeno") return;
+                if (filter === "Završeno" && t.status !== "Završeno") return;
+                
+                let akcije = t.status === "Na čekanju" ? `<button class="btn-start" onclick="promeniStatus(${t.id}, 'U toku')">Započni turu</button>` : 
+                             t.status === "U toku" ? `<button class="btn-kraj" onclick="promeniStatus(${t.id}, 'Završeno')">Završi isporuku</button>` : `<span class="gotovo-tekst">✔ Gotovo</span>`;
+                
+                tabela.innerHTML += `<tr><td>#${t.id}</td><td style="color:#f8fafc; font-weight:500;">${t.kupac}</td><td>${t.vozilo}</td><td>${t.polaziste}</td><td>${t.odrediste}</td><td>${formatirajStatus(t.status)}</td><td>${akcije}</td></tr>`;
+            });
+        }
+
+        async function promeniStatus(idTure, noviStatus) {
+            await fetch(`/azuriraj-status/${idTure}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: noviStatus }) });
+            ucitajTure();
+        }
+        ucitajTure();
+    </script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eLogističar - Prijava</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: #0f172a; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; color: #f8fafc; }
+        .login-kontejner { background: #1e293b; padding: 40px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); width: 360px; text-align: center; border: 1px solid #334155; }
+        h2 { color: #f8fafc; margin-bottom: 30px; font-weight: 700; font-size: 26px; letter-spacing: -0.5px; }
+        input { width: 100%; padding: 14px; margin-bottom: 16px; background-color: #0f172a; border: 1px solid #475569; border-radius: 8px; font-size: 14px; color: #f8fafc; outline: none; transition: all 0.3s ease; }
+        input::placeholder { color: #94a3b8; }
+        input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+        button { width: 100%; padding: 14px; background-color: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; transition: background-color 0.2s; }
+        button:hover { background-color: #2563eb; }
+        #poruka { margin-top: 20px; font-weight: 500; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="login-kontejner">
+        <h2>eLogističar</h2>
+        <input type="text" id="korisnicko_ime" placeholder="Korisničko ime">
+        <input type="password" id="sifra" placeholder="Šifra">
+        <button onclick="prijaviSe()">Prijavi se</button>
+        <p id="poruka"></p>
+    </div>
+
+    <script>
+        async function prijaviSe() {
+            const imeInput = document.getElementById("korisnicko_ime");
+            const sifraInput = document.getElementById("sifra");
+            const porukaElement = document.getElementById("poruka");
+
+            // Resetuj stilove
+            imeInput.style.borderColor = "#475569";
+            sifraInput.style.borderColor = "#475569";
+            porukaElement.innerText = "";
+
+            try {
+                const odgovor = await fetch("/prijava", { 
+                    method: "POST", 
+                    headers: { "Content-Type": "application/json" }, 
+                    body: JSON.stringify({ korisnicko_ime: imeInput.value, sifra: sifraInput.value }) 
+                });
+                const podaci = await odgovor.json();
+
+                if (odgovor.ok) {
+                    localStorage.setItem("korisnik_id", podaci.id);
+                    localStorage.setItem("korisnik_ime", podaci.ime);
+                    localStorage.setItem("korisnik_prezime", podaci.prezime);
+                    localStorage.setItem("korisnik_rola", podaci.rola);
+                    
+                    if (podaci.rola === "Dispecer") window.location.href = "/dispecer";
+                    else if (podaci.rola === "Vozac") window.location.href = "/vozac";
+                } else {
+                    // Validacija: Pogrešna lozinka ili ime
+                    imeInput.style.borderColor = "#ef4444";
+                    sifraInput.style.borderColor = "#ef4444";
+                    porukaElement.style.color = "#ef4444";
+                    porukaElement.innerText = "❌ Pogrešno korisničko ime ili šifra!";
+                }
+            } catch (greska) {
+                porukaElement.style.color = "#ef4444";
+                porukaElement.innerText = "Greška u komunikaciji sa serverom.";
+            }
+        }
+    </script>
+</body>
+</html>
