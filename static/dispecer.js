@@ -334,7 +334,8 @@ function osveziSpisakZahteva() {
 }
 
 async function lansirajTuru() {
-    if (trenutniZahtevi.length === 0) return alert("Dodajte barem jedan zahtev u turu!");
+    if (trenutniZahtevi.length === 0) return prikaziToast("Dodajte barem jedan zahtev u turu!", "greska");
+    
     const tura = {
         id_vozaca: parseInt(document.getElementById("izbor_vozaca").value),
         registracija: document.getElementById("izbor_vozila").value,
@@ -343,6 +344,7 @@ async function lansirajTuru() {
         odrediste: document.getElementById("odrediste").value,
         zahtevi: trenutniZahtevi
     };
+    
     const odgovor = await fetch("/nova-tura", {
         method: "POST",
         headers: {
@@ -350,16 +352,17 @@ async function lansirajTuru() {
         },
         body: JSON.stringify(tura)
     });
+    
     if (odgovor.ok) {
         trenutniZahtevi = [];
         osveziSpisakZahteva();
         ucitajTure();
         osveziKalendar();
         osveziStatistiku();
-        alert("Tura je uspešno kreirana!");
+        prikaziToast("Tura je uspešno kreirana!", "uspeh");
     } else {
         const greska = await odgovor.json();
-        alert("Greška: " + greska.detail);
+        prikaziToast("Greška: " + greska.detail, "greska");
     }
 }
 
@@ -371,17 +374,40 @@ function getStatusBadge(status) {
 
 async function ucitajTure() {
     const odg = await fetch("/sve-ture");
-    const ture = await odg.json();
-    document.getElementById("tabela-tura").innerHTML = ture.map(t =>
+    let sveTure = await odg.json();
+
+    // Čitamo šta je izabrano u padajućem meniju (ako meni još nije učitan, podrazumijevamo "Sve")
+    const filterElement = document.getElementById("filter-aktivnih");
+    const izabraniStatus = filterElement ? filterElement.value : "Sve";
+
+    // 1. Filtriranje: Zadržavamo samo one koje NISU završene
+    let aktivne = sveTure.filter(t => t.status !== "Završeno");
+
+    // 2. Primjena filtera iz padajućeg menija ("Na čekanju" ili "U toku")
+    if (izabraniStatus !== "Sve") {
+        aktivne = aktivne.filter(t => t.status === izabraniStatus);
+    }
+
+    // 3. Sortiranje (najveći ID prvi) i ograničavanje na 10 rezultata
+    const zaPrikaz = aktivne.sort((a, b) => b.id - a.id).slice(0, 10);
+
+    const tbody = document.getElementById("tabela-tura");
+    
+    if (zaPrikaz.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b; padding: 20px;">Trenutno nema aktivnih tura za odabrani filter.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = zaPrikaz.map(t =>
         `<tr>
-                    <td style="color: #3b82f6; font-weight: 500;">TR-${t.id + 2800}</td>
-                    <td>${t.vozac}</td>
-                    <td style="color: #94a3b8;">${t.vozilo}</td>
-                    <td style="color: #94a3b8;">📍 ${t.polaziste} ➔ ${t.odrediste}</td>
-                    <td style="color: #94a3b8;">${t.datum}</td>
-                    <td>${getStatusBadge(t.status)}</td>
-                    <td><button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button></td>
-                </tr>`
+            <td style="color: #3b82f6; font-weight: 500;">TR-${t.id + 2800}</td>
+            <td>${t.vozac}</td>
+            <td style="color: #94a3b8;">${t.vozilo}</td>
+            <td style="color: #94a3b8;">📍 ${t.polaziste} ➔ ${t.odrediste}</td>
+            <td style="color: #94a3b8;">${t.datum}</td>
+            <td>${getStatusBadge(t.status)}</td>
+            <td><button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button></td>
+        </tr>`
     ).join('');
 }
 
@@ -672,3 +698,40 @@ function stampajPutniNalog(idTure) {
         }
 
 ucitajInicijalno();
+
+
+function prikaziToast(poruka, tip = "uspeh") {
+    const toast = document.createElement("div");
+    toast.innerText = poruka;
+    
+
+    toast.style.position = "fixed";
+    toast.style.bottom = "20px";
+    toast.style.right = "20px";
+    toast.style.padding = "12px 24px";
+    toast.style.borderRadius = "8px";
+    toast.style.color = "white";
+    toast.style.fontSize = "14px";
+    toast.style.fontWeight = "600";
+    toast.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
+    toast.style.zIndex = "9999";
+    toast.style.transition = "opacity 0.3s ease, transform 0.3s ease";
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(20px)";
+
+
+    toast.style.backgroundColor = tip === "uspeh" ? "#10b981" : "#ef4444";
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = "1";
+        toast.style.transform = "translateY(0)";
+    }, 10);
+
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(20px)";
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
