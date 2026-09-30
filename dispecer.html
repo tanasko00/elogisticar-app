@@ -94,19 +94,27 @@
                     <select id="izbor_vozaca"></select>
                     <select id="izbor_vozila"></select>
                     <input type="date" id="datum_ture">
-                    <input type="text" id="polaziste" placeholder="Polazište">
-                    <input type="text" id="odrediste" placeholder="Odredište">
+                    <input type="text" id="polaziste" list="lista-gradova" placeholder="Unesi polazište..." autocomplete="off">
+                    <input type="text" id="stajaliste" list="lista-gradova" placeholder="Stajalište (opciono)..." autocomplete="off">
+                    <input type="text" id="odrediste" list="lista-gradova" placeholder="Unesi odredište..." autocomplete="off">
                 </div>
                 
                 <div id="prikaz-popunjenosti" style="margin-bottom: 15px; padding: 12px; background: #0f172a; border-radius: 8px; border: 1px solid #334155; display: none;"></div>
 
-                <h4 style="font-size: 14px; margin-bottom: 10px; color: #94a3b8;">Dodaj zahteve kupaca u ovaj kamion:</h4>
+                <h4 style="font-size: 14px; margin-bottom: 10px; color: #94a3b8;">Dodaj zahteve kupaca</h4>
                 <div class="form-red">
                     <select id="izbor_kupca"></select>
                     <input type="text" id="opis_robe" placeholder="Opis robe">
+                    
+                    <!-- OVDJE DODAJEMO NOVI PADAJUĆI MENI -->
+                    <select id="mesto_istovara" style="padding: 10px; background-color: #0f172a; border: 1px solid #475569; border-radius: 6px; color: white; outline: none;">
+                        <option value="Krajnje odredište">🏁 Krajnje odredište</option>
+                        <option value="Stajalište">🚛 Stajalište (Tranzit)</option>
+                    </select>
+
                     <button class="btn-sekundarno" onclick="dodajPrivremeniZahtev()">Dodaj zahtev u kamion</button>
                 </div>
-                
+
                 <div class="lista-zahteva" id="spisak-dodatih-zahteva">
                     <span style="color: #64748b;">Nema dodatih zahteva u turu...</span>
                 </div>

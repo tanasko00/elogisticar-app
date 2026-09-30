@@ -13,10 +13,25 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 def inicijalizuj_bazu():
     konekcija = sqlite3.connect("elogisticar.db")
     kursor = konekcija.cursor()
+    
     try:
         kursor.execute("ALTER TABLE Tura ADD COLUMN Datum TEXT DEFAULT '2026-09-29'")
     except:
         pass
+
+    try:
+        kursor.execute("ALTER TABLE Tura ADD COLUMN stajaliste TEXT DEFAULT ''")
+    except:
+        pass
+    try:
+        kursor.execute("ALTER TABLE Tura ADD COLUMN kilometraza INTEGER DEFAULT 0")
+    except:
+        pass
+    try:
+        kursor.execute("ALTER TABLE Tura ADD COLUMN km_do_stajalista INTEGER DEFAULT 0")
+    except:
+        pass
+
     kursor.execute("""
         CREATE TABLE IF NOT EXISTS Zahtev (
             ID_Zahteva INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,6 +43,7 @@ def inicijalizuj_bazu():
             FOREIGN KEY (ID_Ture) REFERENCES Tura(ID_Ture)
         )
     """)
+    
     kursor.execute('''
         CREATE TABLE IF NOT EXISTS poruke (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,10 +53,31 @@ def inicijalizuj_bazu():
             vreme TEXT
         )
     ''')
+    
     try:
         kursor.execute("ALTER TABLE poruke ADD COLUMN primalac_ime TEXT DEFAULT 'Svi'")
     except:
         pass
+
+    kursor.execute("""
+    CREATE TABLE IF NOT EXISTS gradovi (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        naziv TEXT UNIQUE NOT NULL
+    )
+    """)
+    
+    kursor.execute("SELECT COUNT(*) FROM gradovi")
+    if kursor.fetchone()[0] == 0:
+        pocetni_gradovi = [
+            "Beograd", "Novi Sad", "Niš", "Kragujevac", "Subotica", "Čačak", 
+            "Kraljevo", "Kruševac", "Surčin", "Zagreb", "Sarajevo", "Banja Luka", 
+            "Skoplje", "Podgorica", "Ljubljana", "Beč", "Budimpešta", "Minhen", 
+            "Štutgart", "Frankfurt", "Berlin", "Bukurešt", "Temišvar", "Sofija", 
+            "Atina", "Solun", "Milano", "Rim", "Pariz", "Prag", "Bratislava", 
+            "Rio de Žaneiro", "Moskva", "Peking"
+        ]
+        kursor.executemany("INSERT OR IGNORE INTO gradovi (naziv) VALUES (?)", [(g,) for g in pocetni_gradovi])
+
     konekcija.commit()
     konekcija.close()
 
@@ -55,11 +92,14 @@ class ZahtevZaTuru(BaseModel):
     roba: str
 
 class PodaciZaTuru(BaseModel):
-    polaziste: str
-    odrediste: str
     id_vozaca: int
     registracija: str
     datum: str
+    polaziste: str
+    stajaliste: str = ""    
+    odrediste: str
+    kilometraza: int = 0   
+    km_do_stajalista: int = 0
     zahtevi: List[ZahtevZaTuru]
 
 class NoviStatus(BaseModel):
@@ -86,6 +126,16 @@ class NovaPoruka(BaseModel):
     rola: str
     primalac: str = "Svi"
     tekst: str
+
+class NovaTura(BaseModel):
+    id_vozaca: int
+    registracija: str
+    datum: str
+    polaziste: str
+    stajaliste: str = ""
+    odrediste: str
+    kilometraza: int = 0
+    zahtevi: list
 
 @app.get("/")
 def pocetna(): return FileResponse("index.html")
@@ -157,33 +207,60 @@ def dodaj_turu(tura: PodaciZaTuru):
     konekcija = sqlite3.connect("elogisticar.db")
     kursor = konekcija.cursor()
     try:
-       
         kursor.execute("""
             SELECT ID_Ture FROM Tura 
             WHERE Datum = ? AND Status_Realizacije != 'Završeno' 
             AND (Registarski_br = ? OR Id_Korisnika = ?)
         """, (tura.datum, tura.registracija, tura.id_vozaca))
         
-        postojeca = kursor.fetchone()
-        if postojeca:
-            raise HTTPException(status_code=400, detail="Vozač ili vozilo su već zauzeti na odabrani datum!")
+        if kursor.fetchone():
+            raise HTTPException(status_code=400, detail="Vozač ili vozilo su već zauzeti!")
 
-
-        kursor.execute("INSERT INTO Tura (Id_Korisnika, Registarski_br, PIB_Kupca, Polaziste, Odrediste, Status_Realizacije, Datum) VALUES (?, ?, '', ?, ?, 'Na čekanju', ?)", 
-                       (tura.id_vozaca, tura.registracija, tura.polaziste, tura.odrediste, tura.datum))
+        kursor.execute("""
+            INSERT INTO Tura (Id_Korisnika, Registarski_br, PIB_Kupca, Polaziste, stajaliste, Odrediste, kilometraza, km_do_stajalista, Status_Realizacije, Datum) 
+            VALUES (?, ?, '', ?, ?, ?, ?, ?, 'Na čekanju', ?)
+        """, (tura.id_vozaca, tura.registracija, tura.polaziste, tura.stajaliste, tura.odrediste, tura.kilometraza, tura.km_do_stajalista, tura.datum))
+        
         id_ture = kursor.lastrowid
         
         for z in tura.zahtevi:
-            kursor.execute("INSERT INTO Zahtev (PIB_Kupca, Roba, ID_Ture) VALUES (?, ?, ?)", (z.pib_kupca, z.roba, id_ture))
+            if isinstance(z, dict):
+                pib, roba = z.get('pib_kupca', ''), z.get('roba', '')
+            else:
+                pib, roba = getattr(z, 'pib_kupca', ''), getattr(z, 'roba', '')
+            kursor.execute("INSERT INTO Zahtev (PIB_Kupca, Roba, ID_Ture) VALUES (?, ?, ?)", (pib, roba, id_ture))
         
         konekcija.commit()
         return {"status": "Uspešno"}
-    except HTTPException as e:
-        raise e
     except Exception as g: 
         raise HTTPException(status_code=500, detail=str(g))
     finally: 
         konekcija.close()
+
+@app.get("/ture-vozaca/{id_vozaca}")
+def ture_vozaca(id_vozaca: int):
+    konekcija = sqlite3.connect("elogisticar.db")
+    kursor = konekcija.cursor()
+    upit = """
+        SELECT T.ID_Ture, T.Registarski_br, T.Polaziste, T.Odrediste, T.Status_Realizacije,
+               GROUP_CONCAT(K.Naziv_kompanije || ' - ' || Z.Roba, '<br>'),
+               T.stajaliste, T.kilometraza, T.km_do_stajalista
+        FROM Tura T
+        LEFT JOIN Zahtev Z ON T.ID_Ture = Z.ID_Ture
+        LEFT JOIN Kupac K ON Z.PIB_Kupca = K.PIB_Kupca
+        WHERE T.Id_Korisnika = ?
+        GROUP BY T.ID_Ture
+        ORDER BY T.ID_Ture DESC
+    """
+    kursor.execute(upit, (id_vozaca,))
+    ture_baza = kursor.fetchall()
+    konekcija.close()
+    
+    return [{
+        "id": t[0], "vozilo": t[1] or "Nema", "polaziste": t[2], "odrediste": t[3], 
+        "status": t[4], "kupac": t[5] or "Nema dodatih zahteva",
+        "stajaliste": t[6] or "", "kilometraza": t[7] or 0, "km_do_stajalista": t[8] or 0
+    } for t in ture_baza]
 
 @app.get("/sedmicni-pregled")
 def sedmicni_pregled(pocetni_datum: str = None):
@@ -249,13 +326,35 @@ def sedmicni_pregled(pocetni_datum: str = None):
 def dohvati_ture():
     konekcija = sqlite3.connect("elogisticar.db")
     kursor = konekcija.cursor()
+    
     kursor.execute("""
-        SELECT T.ID_Ture, K.Ime, K.Prezime, T.Registarski_br, T.Polaziste, T.Odrediste, T.Status_Realizacije, T.Datum
+        SELECT T.ID_Ture, K.Ime, K.Prezime, T.Registarski_br, T.Polaziste, T.stajaliste, T.Odrediste, T.kilometraza, T.Status_Realizacije, T.Datum
         FROM Tura T LEFT JOIN Korisnik K ON T.Id_Korisnika = K.Id_Korisnika
+        ORDER BY T.ID_Ture DESC
     """)
     ture_baza = kursor.fetchall()
+    
+    rezultat = []
+    for t in ture_baza:
+        kursor.execute("SELECT Roba FROM Zahtev WHERE ID_Ture = ?", (t[0],))
+        roba_baza = kursor.fetchall()
+        teret_tekst = ", ".join([r[0] for r in roba_baza]) if roba_baza else "Nema specificiranog tereta"
+        
+        rezultat.append({
+            "id": t[0], 
+            "vozac": f"{t[1]} {t[2]}", 
+            "vozilo": t[3], 
+            "polaziste": t[4], 
+            "stajaliste": t[5] or "",       
+            "odrediste": t[6], 
+            "kilometraza": t[7] or 0,      
+            "status": t[8], 
+            "datum": t[9],
+            "kupac": teret_tekst           
+        })
+        
     konekcija.close()
-    return [{"id": t[0], "vozac": f"{t[1]} {t[2]}", "vozilo": t[3], "polaziste": t[4], "odrediste": t[5], "status": t[6], "datum": t[7]} for t in ture_baza]
+    return rezultat
 
 @app.delete("/obrisi-turu/{id_ture}")
 def obrisi_turu(id_ture: int):
@@ -292,12 +391,14 @@ def ture_vozaca(id_vozaca: int):
     kursor = konekcija.cursor()
     upit = """
         SELECT T.ID_Ture, T.Registarski_br, T.Polaziste, T.Odrediste, T.Status_Realizacije,
-               GROUP_CONCAT(K.Naziv_kompanije || ' - ' || Z.Roba, ', ') as DetaljiKupaca
+               GROUP_CONCAT(K.Naziv_kompanije || ' - ' || Z.Roba, '<br>'),
+               T.stajaliste, T.kilometraza, T.km_do_stajalista
         FROM Tura T
         LEFT JOIN Zahtev Z ON T.ID_Ture = Z.ID_Ture
         LEFT JOIN Kupac K ON Z.PIB_Kupca = K.PIB_Kupca
         WHERE T.Id_Korisnika = ?
         GROUP BY T.ID_Ture
+        ORDER BY T.ID_Ture DESC
     """
     kursor.execute(upit, (id_vozaca,))
     ture_baza = kursor.fetchall()
@@ -310,7 +411,10 @@ def ture_vozaca(id_vozaca: int):
             "polaziste": t[2], 
             "odrediste": t[3], 
             "status": t[4], 
-            "kupac": t[5] or "Nema dodatih zahteva"
+            "kupac": t[5] or "Nema dodatih zahteva",
+            "stajaliste": t[6] or "",
+            "kilometraza": t[7] or 0,
+            "km_do_stajalista": t[8] or 0
         } for t in ture_baza
     ]
 

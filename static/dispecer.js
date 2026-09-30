@@ -273,18 +273,21 @@ function osveziPrikazKapaciteta() {
 function dodajPrivremeniZahtev() {
     const voziloSelect = document.getElementById("izbor_vozila");
     const kupacSelect = document.getElementById("izbor_kupca");
-    const roba = document.getElementById("opis_robe").value.trim();
+    const robaInput = document.getElementById("opis_robe").value.trim();
+    
+    const mestoIstovaraElement = document.getElementById("mesto_istovara");
+    const lokacijaIstovara = mestoIstovaraElement ? mestoIstovaraElement.value : "Krajnje odredište";
 
     if (!voziloSelect.value) return alert("Prvo izaberi vozilo!");
-    if (!kupacSelect.value || !roba) return alert("Izaberi kupca i unesi robu.");
+    if (!kupacSelect.value || !robaInput) return alert("Izaberi kupca i unesi robu.");
 
     const tipVozila = voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-tip");
     const maksimalnaNosivost = parseFloat(voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-nosivost"));
 
-    const match = roba.match(/\d+(\.\d+)?/);
+    const match = robaInput.match(/\d+(\.\d+)?/);
     if (!match) return alert("Morate uneti količinu u brojevima (npr. '500 kg', '2 t' ili '1000 l').");
     let unetiBroj = parseFloat(match[0]);
-    const robaMala = roba.toLowerCase();
+    const robaMala = robaInput.toLowerCase();
 
     if (tipVozila === "Cisterna" && (robaMala.includes("palet") || robaMala.includes("kutij") || robaMala.includes("kg") || robaMala.includes("ton"))) {
         return alert("Greška: Cisterna prima isključivo tečnost u litrima!");
@@ -314,10 +317,12 @@ function dodajPrivremeniZahtev() {
         else return alert(` Prekoračenje nosivosti teretnjaka!\nMax: ${maksimalnaNosivost} t.`);
     }
 
+    const finalRoba = `[${lokacijaIstovara}] ${robaInput}`;
+
     trenutniZahtevi.push({
         pib_kupca: kupacSelect.value,
         naziv: kupacSelect.options[kupacSelect.selectedIndex].text,
-        roba: roba
+        roba: finalRoba
     });
     osveziSpisakZahteva();
     document.getElementById("opis_robe").value = "";
@@ -336,20 +341,30 @@ function osveziSpisakZahteva() {
 async function lansirajTuru() {
     if (trenutniZahtevi.length === 0) return prikaziToast("Dodajte barem jedan zahtev u turu!", "greska");
     
+    const stajalisteElement = document.getElementById("stajaliste");
+    const stajalisteTxt = stajalisteElement ? stajalisteElement.value.trim() : "";
+    const polazisteTxt = document.getElementById("polaziste").value;
+    const odredisteTxt = document.getElementById("odrediste").value;
+
+    prikaziToast("Računam rutu i kreiram turu...", "uspeh");
+
+    const autoKm = await izracunajRutu(polazisteTxt, stajalisteTxt, odredisteTxt);
+    
     const tura = {
         id_vozaca: parseInt(document.getElementById("izbor_vozaca").value),
         registracija: document.getElementById("izbor_vozila").value,
         datum: document.getElementById("datum_ture").value,
-        polaziste: document.getElementById("polaziste").value,
-        odrediste: document.getElementById("odrediste").value,
+        polaziste: polazisteTxt,
+        stajaliste: stajalisteTxt,
+        odrediste: odredisteTxt,
+        kilometraza: autoKm.ukupno,
+        km_do_stajalista: autoKm.do_stajalista,
         zahtevi: trenutniZahtevi
     };
     
     const odgovor = await fetch("/nova-tura", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(tura)
     });
     
@@ -368,7 +383,7 @@ async function lansirajTuru() {
 
 function getStatusBadge(status) {
     if (status === "Završeno") return '<span class="status-btn status-zavrseno">● Završeno</span>';
-    if (status === "U toku") return '<span class="status-btn status-u-toku">● U toku</span>';
+    if (status === "U toku" || status === "Ka odredištu") return '<span class="status-btn status-u-toku">● ' + status + '</span>';
     return '<span class="status-btn status-na-cekanju">● Na čekanju</span>';
 }
 
@@ -381,7 +396,9 @@ async function ucitajTure() {
 
     let aktivne = sveTure.filter(t => t.status !== "Završeno");
 
-    if (izabraniStatus !== "Sve") {
+    if (izabraniStatus === "U toku") {
+        aktivne = aktivne.filter(t => t.status === "U toku" || t.status === "Ka odredištu");
+    } else if (izabraniStatus !== "Sve") {
         aktivne = aktivne.filter(t => t.status === izabraniStatus);
     }
 
@@ -974,7 +991,10 @@ async function dohvatiVreme(grad) {
             "kopenhagen": "Copenhagen",
             "stokholm": "Stockholm",
             "geteborg": "Gothenburg",
-            "marsej": "Marseille"
+            "marsej": "Marseille",
+            "rio de zaneiro": "Rio de Janeiro",
+            "rio de žaneiro": "Rio de Janeiro",
+            "rio": "Rio de Janeiro"
         };
 
         const kljuc = cistGrad.toLowerCase();
@@ -1038,3 +1058,53 @@ async function pametnoOsvezavanje() {
 }
 
 setInterval(pametnoOsvezavanje, 5000);
+
+
+async function dobijKoordinate(grad) {
+    if (!grad) return null;
+    try {
+        let cistGrad = grad.trim().toLowerCase();
+        // Pametni rječnik za prevod 
+        const prevod = { "bukurest": "Bucharest", "bukurešt": "Bucharest", "beč": "Vienna", "bec": "Vienna", "solun": "Thessaloniki", "budimpešta": "Budapest", "budimpesta": "Budapest", "pariz": "Paris", "rim": "Rome", "moskva": "Moscow", "peking": "Beijing", "minhen": "Munich", "keln": "Cologne", "štutgart": "Stuttgart", "stutgart": "Stuttgart", "nirnberg": "Nuremberg", "lajpcig": "Leipzig", "hanover": "Hanover", "milano": "Milan", "venecija": "Venice", "firenca": "Florence", "đenova": "Genoa", "denova": "Genoa", "trst": "Trieste", "napulj": "Naples", "torino": "Turin", "prag": "Prague", "varšava": "Warsaw", "varsava": "Warsaw", "krakov": "Krakow", "segedin": "Szeged", "temišvar": "Timisoara", "temisvar": "Timisoara", "sofija": "Sofia", "atina": "Athens", "brisel": "Brussels", "antverpen": "Antwerp", "hag": "The Hague", "ženeva": "Geneva", "zeneva": "Geneva", "cirih": "Zurich", "barselona": "Barcelona", "sevilja": "Seville", "lisabon": "Lisbon", "kopenhagen": "Copenhagen", "stokholm": "Stockholm", "geteborg": "Gothenburg", "marsej": "Marseille", "rio de zaneiro": "Rio de Janeiro", "rio de žaneiro": "Rio de Janeiro", "rio": "Rio de Janeiro" };
+        
+        if (prevod[cistGrad]) cistGrad = prevod[cistGrad];
+
+        const geoOdg = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cistGrad)}&count=1`);
+        const geoPodaci = await geoOdg.json();
+        
+        if (geoPodaci.results && geoPodaci.results.length > 0) {
+            return { lat: geoPodaci.results[0].latitude, lon: geoPodaci.results[0].longitude };
+        }
+        return null;
+    } catch (e) { return null; }
+}
+
+async function izracunajRutu(polaziste, stajaliste, odrediste) {
+    try {
+        const t1 = await dobijKoordinate(polaziste);
+        const t3 = await dobijKoordinate(odrediste);
+        if (!t1 || !t3) return { ukupno: 0, do_stajalista: 0 };
+
+        let coords = `${t1.lon},${t1.lat}`;
+        if (stajaliste) {
+            const t2 = await dobijKoordinate(stajaliste);
+            if (t2) coords += `;${t2.lon},${t2.lat}`;
+        }
+        coords += `;${t3.lon},${t3.lat}`;
+
+        const osrmOdg = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=false`);
+        const osrmPodaci = await osrmOdg.json();
+        
+        if (osrmPodaci.routes && osrmPodaci.routes.length > 0) {
+            const ruta = osrmPodaci.routes[0];
+            const ukupno = Math.round(ruta.distance / 1000);
+            let do_stajalista = 0;
+            
+            if (stajaliste && ruta.legs.length > 1) {
+                do_stajalista = Math.round(ruta.legs[0].distance / 1000);
+            }
+            return { ukupno: ukupno, do_stajalista: do_stajalista };
+        }
+        return { ukupno: 0, do_stajalista: 0 };
+    } catch (e) { return { ukupno: 0, do_stajalista: 0 }; }
+}

@@ -30,8 +30,9 @@ function primeniFilter() {
 
     const prioritetStatusa = {
         "U toku": 1,
-        "Na čekanju": 2,
-        "Završeno": 3
+        "Ka odredištu": 2,
+        "Na čekanju": 3,
+        "Završeno": 4
     };
 
     filtriraneTure.sort((a, b) => {
@@ -48,56 +49,129 @@ async function renderTure(ture) {
     const kontejner = document.getElementById('lista-tura');
     
     if (ture.length === 0) {
-        kontejner.innerHTML = `
-            <div class="prazno-stanje">
-                <div></div>
-                Nema tura za odabrani status.
-            </div>`;
+        kontejner.innerHTML = `<div class="prazno-stanje"><div></div>Nema tura za odabrani status.</div>`;
         return;
     }
 
     const redovi = await Promise.all(ture.map(async (t) => {
-        let statusBadge = '';
+        const ukupnoKm = t.kilometraza || 0;
+        const kmDoStajalista = t.km_do_stajalista || 0;
+        const kmDoOdredista = (ukupnoKm - kmDoStajalista > 0) ? (ukupnoKm - kmDoStajalista) : 0;
+        
         let akcionoDugme = '';
+        let statusBoja = '#94a3b8'; 
+        let procenat = 0;
+        let preostaloKm = ukupnoKm;
+        let prikazStatusa = t.status;
+        let navigacijaCilj = t.odrediste;
 
         if (t.status === 'Na čekanju') {
-            statusBadge = `<span class="badge bg-zuta">Na čekanju</span>`;
-            akcionoDugme = `<button class="btn-akcija btn-zapocni" onclick="promeniStatus(${t.id}, 'U toku')">▶ Započni vožnju</button>`;
+            statusBoja = '#f59e0b'; 
+            akcionoDugme = `<button class="btn-akcija btn-zapocni" onclick="promeniStatus(${t.id}, 'U toku')" style="flex: 1; background-color: #3b82f6; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold;">▶ Započni vožnju</button>`;
         } else if (t.status === 'U toku') {
-            statusBadge = `<span class="badge bg-plava">U toku</span>`;
-            akcionoDugme = `<button class="btn-akcija btn-zavrsi" onclick="promeniStatus(${t.id}, 'Završeno')">✔ Obeleži kao završeno</button>`;
-        } else {
-            statusBadge = `<span class="badge bg-zelena">Završeno</span>`;
-            akcionoDugme = ``; 
+            statusBoja = '#10b981'; 
+            if (t.stajaliste) {
+                prikazStatusa = 'Ka stajalištu';
+                navigacijaCilj = t.stajaliste; // Navigacija vodi samo do stajališta
+                procenat = ukupnoKm > 0 ? Math.round((kmDoStajalista / ukupnoKm) * 100) : 30;
+                if(procenat > 90) procenat = 90; // Vizuelna korekcija
+                preostaloKm = kmDoOdredista > 0 ? kmDoOdredista : Math.round(ukupnoKm * 0.5); 
+                
+                akcionoDugme = `<button class="btn-akcija btn-zavrsi" onclick="promeniStatus(${t.id}, 'Ka odredištu')" style="flex: 1; background-color: #f59e0b; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold;">✔ Istovareno (Stajalište)</button>`;
+            } else {
+                procenat = 50; 
+                preostaloKm = Math.round(ukupnoKm * 0.5); 
+                akcionoDugme = `<button class="btn-akcija btn-zavrsi" onclick="promeniStatus(${t.id}, 'Završeno')" style="flex: 1; background-color: #10b981; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold;">✔ Potvrdi isporuku</button>`;
+            }
+        } else if (t.status === 'Ka odredištu') {
+            statusBoja = '#10b981';
+            procenat = 80;
+            preostaloKm = Math.round(kmDoOdredista * 0.5); 
+            akcionoDugme = `<button class="btn-akcija btn-zavrsi" onclick="promeniStatus(${t.id}, 'Završeno')" style="flex: 1; background-color: #10b981; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold;">✔ Krajnja isporuka</button>`;
+        } else if (t.status === 'Završeno') {
+            statusBoja = '#10b981'; 
+            procenat = 100;
+            preostaloKm = 0;
         }
 
-        const urlMape = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(t.polaziste)}&destination=${encodeURIComponent(t.odrediste)}`;
-        const navigacijaDugme = `<a href="${urlMape}" target="_blank" class="btn-akcija" style="background-color: #334155; color: white; text-decoration: none;">Navigacija</a>`;
+        const urlMape = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(t.polaziste)}&destination=${encodeURIComponent(navigacijaCilj)}`;
+        const navigacijaDugme = `<a href="${urlMape}" target="_blank" class="btn-akcija" style="flex: 1; background-color: #334155; color: white; text-decoration: none; text-align: center; padding: 10px; border-radius: 8px; font-weight: bold;">Navigacija</a>`;
+        
         const akcijeHtml = (t.status !== 'Završeno') 
-            ? `<div class="akcije">${akcionoDugme}${navigacijaDugme}</div>` 
+            ? `<div class="akcije" style="display: flex; gap: 10px; margin-top: 16px;">${akcionoDugme}${navigacijaDugme}</div>` 
             : ``;
 
         const vremeBedz = await dohvatiVreme(t.odrediste);
 
+        const bojaStajalista = (t.status === 'Ka odredištu' || t.status === 'Završeno') ? '#10b981' : '#f59e0b';
+        const ikonaStajalista = (t.status === 'Ka odredištu' || t.status === 'Završeno') ? '✓' : '🚛';
+
+        const tranzitHtml = t.stajaliste ? `
+            <div style="font-size: 10px; color: #94a3b8; margin-left: 32px; margin-top: 4px; margin-bottom: 4px;">↓ ${kmDoStajalista} km</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 24px; height: 24px; border-radius: 50%; border: 1px solid ${bojaStajalista}; background: ${(t.status === 'Ka odredištu' || t.status === 'Završeno') ? '#10b981' : 'transparent'}; display: flex; align-items: center; justify-content: center; font-size: 11px; color: white;">${ikonaStajalista}</div>
+                <div>
+                    <div style="font-size: 14px; font-weight: 600; color: white;">${t.stajaliste}</div>
+                    <span style="background: ${bojaStajalista}33; color: ${bojaStajalista}; font-size: 10px; padding: 2px 6px; border-radius: 4px;">Stajalište (Istovar)</span>
+                </div>
+            </div>
+            <div style="width: 1px; height: 16px; background: #334155; margin-left: 12px;"></div>
+            <div style="font-size: 10px; color: #94a3b8; margin-left: 32px; margin-top: -12px; margin-bottom: 4px;">↓ ${kmDoOdredista} km</div>
+        ` : `
+            <div style="width: 1px; height: 16px; background: #10b981; margin-left: 12px;"></div>
+            <div style="font-size: 10px; color: #94a3b8; margin-left: 32px; margin-top: -12px; margin-bottom: 4px;">↓ ${ukupnoKm} km</div>
+        `;
+
         return `
-            <div class="kartica">
-                <div class="kartica-header">
-                    <span class="tura-id">TR-${t.id + 2800}</span>
-                    ${statusBadge}
+            <div class="kartica" style="background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 16px; border: 1px solid #334155;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: bold; letter-spacing: 1px;">RUTA</span>
+                    <span style="background: ${statusBoja}22; color: ${statusBoja}; font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: bold;">● ${prikazStatusa}</span>
                 </div>
-                <div class="kartica-body">
-                    <div class="info-red">
-                        <span class="ikona">📍</span> 
-                        <span><strong>${t.polaziste}</strong> ➔ <strong>${t.odrediste}</strong> ${vremeBedz}</span>
+
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px;">✓</div>
+                        <div>
+                            <div style="font-size: 14px; font-weight: 600; color: white;">${t.polaziste}</div>
+                            <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; font-size: 10px; padding: 2px 6px; border-radius: 4px;">Utovar</span>
+                        </div>
                     </div>
-                    <div class="info-red">
-                        <span class="ikona">🚚</span> 
-                        <span>Vozilo: <strong>${t.vozilo}</strong></span>
-                    </div>
-                    <div class="roba-box">
-                         Teret: ${t.kupac}
+                    
+                    ${tranzitHtml}
+
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 24px; height: 24px; border-radius: 50%; border: 1px solid #64748b; display: flex; align-items: center; justify-content: center; font-size: 11px; color: white;">🏁</div>
+                        <div>
+                            <div style="font-size: 14px; font-weight: 600; color: white;">${t.odrediste} ${vremeBedz}</div>
+                            <span style="background: #334155; color: #94a3b8; font-size: 10px; padding: 2px 6px; border-radius: 4px;">Krajnje odredište</span>
+                        </div>
                     </div>
                 </div>
+
+                <div style="margin-bottom: 16px; padding: 10px; background: rgba(51, 65, 85, 0.3); border-radius: 8px;">
+                    <div style="font-size: 12px; color: #94a3b8;">Klijent / Teret: <strong style="color: white; display: block; margin-top: 4px;">${t.kupac}</strong></div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; border-top: 1px solid #334155; padding-top: 12px; text-align: center;">
+                    <div>
+                        <div style="font-size: 11px; color: #94a3b8;">Ukupno km</div>
+                        <div style="font-size: 16px; font-weight: bold; color: white;">${ukupnoKm} <span style="font-size: 11px; font-weight: normal;">km</span></div>
+                    </div>
+                    <div style="border-left: 1px solid #334155; border-right: 1px solid #334155; padding: 0 16px;">
+                        <div style="font-size: 11px; color: #94a3b8;">Preostalo</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #f59e0b;">${preostaloKm} <span style="font-size: 11px; font-weight: normal;">km</span></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; color: #94a3b8;">Napredak</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #10b981;">${procenat}%</div>
+                    </div>
+                </div>
+
+                <div style="width: 100%; background: #334155; height: 6px; border-radius: 3px; margin-top: 12px; overflow: hidden;">
+                    <div style="width: ${procenat}%; background: #10b981; height: 100%; transition: width 0.4s ease; box-shadow: 0 0 8px #10b981;"></div>
+                </div>
+
                 ${akcijeHtml}
             </div>
         `;
