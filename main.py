@@ -16,7 +16,7 @@ def inicijalizuj_bazu():
     try:
         kursor.execute("ALTER TABLE Tura ADD COLUMN Datum TEXT DEFAULT '2026-09-29'")
     except:
-        pass # Kolona već postoji
+        pass
     kursor.execute("""
         CREATE TABLE IF NOT EXISTS Zahtev (
             ID_Zahteva INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,6 +28,19 @@ def inicijalizuj_bazu():
             FOREIGN KEY (ID_Ture) REFERENCES Tura(ID_Ture)
         )
     """)
+    kursor.execute('''
+        CREATE TABLE IF NOT EXISTS poruke (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            posiljalac_ime TEXT,
+            posiljalac_rola TEXT,
+            tekst TEXT,
+            vreme TEXT
+        )
+    ''')
+    try:
+        kursor.execute("ALTER TABLE poruke ADD COLUMN primalac_ime TEXT DEFAULT 'Svi'")
+    except:
+        pass
     konekcija.commit()
     konekcija.close()
 
@@ -47,7 +60,7 @@ class PodaciZaTuru(BaseModel):
     id_vozaca: int
     registracija: str
     datum: str
-    zahtevi: List[ZahtevZaTuru] # Više zahteva za zbirni transport
+    zahtevi: List[ZahtevZaTuru]
 
 class NoviStatus(BaseModel):
     status: str
@@ -67,6 +80,12 @@ class NoviVozac(BaseModel):
     ime: str
     prezime: str
     sifra: str
+
+class NovaPoruka(BaseModel):
+    ime: str
+    rola: str
+    primalac: str = "Svi"
+    tekst: str
 
 @app.get("/")
 def pocetna(): return FileResponse("index.html")
@@ -110,20 +129,16 @@ def statistika():
     konekcija = sqlite3.connect("elogisticar.db")
     kursor = konekcija.cursor()
     
-    # 1. Ukupno vozila u floti
     kursor.execute("SELECT COUNT(*) FROM Vozilo")
     ukupno_vozila = kursor.fetchone()[0]
     
-    # 2. Vozila koja su trenutno zauzeta (imaju dodeljenu turu koja nije 'Završeno')
     kursor.execute("SELECT COUNT(DISTINCT Registarski_br) FROM Tura WHERE Status_Realizacije != 'Završeno'")
     zauzeta_vozila = kursor.fetchone()[0]
     dostupna_vozila = ukupno_vozila - zauzeta_vozila
     
-    # 3. Ukupno aktivnih tura na nivou celog sistema
     kursor.execute("SELECT COUNT(*) FROM Tura WHERE Status_Realizacije != 'Završeno'")
     aktivne_ture = kursor.fetchone()[0]
     
-    # 4. Ture završene danas (za zelenu statistiku)
     danas = datetime.now().strftime('%Y-%m-%d')
     kursor.execute("SELECT COUNT(*) FROM Tura WHERE Status_Realizacije = 'Završeno' AND Datum = ?", (danas,))
     zavrseno_danas = kursor.fetchone()[0]
@@ -153,7 +168,7 @@ def dodaj_turu(tura: PodaciZaTuru):
         if postojeca:
             raise HTTPException(status_code=400, detail="Vozač ili vozilo su već zauzeti na odabrani datum!")
 
-        #kreiramo turu
+
         kursor.execute("INSERT INTO Tura (Id_Korisnika, Registarski_br, PIB_Kupca, Polaziste, Odrediste, Status_Realizacije, Datum) VALUES (?, ?, '', ?, ?, 'Na čekanju', ?)", 
                        (tura.id_vozaca, tura.registracija, tura.polaziste, tura.odrediste, tura.datum))
         id_ture = kursor.lastrowid
@@ -175,11 +190,10 @@ def sedmicni_pregled(pocetni_datum: str = None):
     konekcija = sqlite3.connect("elogisticar.db")
     kursor = konekcija.cursor()
     
-    # 1. Hvatanje svih vozila
+
     kursor.execute("SELECT Registarski_br, Tip_vozila, Nosivost FROM Vozilo")
     vozila_baza = kursor.fetchall()
     
-    # 2. Hvatanje tura s imenom vozača
     kursor.execute("""
         SELECT T.ID_Ture, T.Registarski_br, T.Datum, T.Status_Realizacije, T.Polaziste, T.Odrediste, K.Ime || ' ' || K.Prezime
         FROM Tura T
@@ -187,7 +201,7 @@ def sedmicni_pregled(pocetni_datum: str = None):
     """)
     ture = kursor.fetchall()
     
-    # 3. Hvatanje zahtjeva (robe) po turama
+
     kursor.execute("""
         SELECT Z.ID_Ture, Z.Roba, Ku.Naziv_kompanije
         FROM Zahtev Z
@@ -276,7 +290,6 @@ def novi_vozac(v: NoviVozac):
 def ture_vozaca(id_vozaca: int):
     konekcija = sqlite3.connect("elogisticar.db")
     kursor = konekcija.cursor()
-    # GROUP_CONCAT spaja sve firme i robe iz tabele Zahtev u jedan tekst
     upit = """
         SELECT T.ID_Ture, T.Registarski_br, T.Polaziste, T.Odrediste, T.Status_Realizacije,
                GROUP_CONCAT(K.Naziv_kompanije || ' - ' || Z.Roba, ', ') as DetaljiKupaca
@@ -301,7 +314,7 @@ def ture_vozaca(id_vozaca: int):
         } for t in ture_baza
     ]
 
-# RUTA ZA VOZAČA: Promena statusa (U toku, Završeno)
+
 @app.post("/azuriraj-status/{id_ture}")
 def azuriraj_status(id_ture: int, podaci: NoviStatus):
     konekcija = sqlite3.connect("elogisticar.db")
@@ -311,7 +324,26 @@ def azuriraj_status(id_ture: int, podaci: NoviStatus):
     konekcija.close()
     return {"status": "Uspešno"}
 
-# --- PYDANTIC MODELI ZA IZMENE ---
+@app.post("/posalji-poruku")
+def posalji_poruku(poruka: NovaPoruka):
+    konekcija = sqlite3.connect("elogisticar.db")
+    kursor = konekcija.cursor()
+    vreme = datetime.now().strftime("%H:%M")
+    kursor.execute("INSERT INTO poruke (posiljalac_ime, posiljalac_rola, primalac_ime, tekst, vreme) VALUES (?, ?, ?, ?, ?)", 
+                   (poruka.ime, poruka.rola, poruka.primalac, poruka.tekst, vreme))
+    konekcija.commit()
+    konekcija.close()
+    return {"status": "uspeh"}
+
+@app.get("/poruke")
+def preuzmi_poruke():
+    konekcija = sqlite3.connect("elogisticar.db")
+    kursor = konekcija.cursor()
+    kursor.execute("SELECT id, posiljalac_ime, posiljalac_rola, primalac_ime, tekst, vreme FROM poruke ORDER BY id ASC")
+    rezultat = [{"id": row[0], "ime": row[1], "rola": row[2], "primalac": row[3], "tekst": row[4], "vreme": row[5]} for row in kursor.fetchall()]
+    konekcija.close()
+    return rezultat
+
 class IzmenaSifre(BaseModel):
     id_vozaca: int
     nova_sifra: str
@@ -327,7 +359,6 @@ class IzmenaVozila(BaseModel):
     nosivost: float
     tip: str
 
-# --- VOZILA (Pregled, Izmena, Brisanje) ---
 @app.get("/sva-vozila")
 def sva_vozila():
     konekcija = sqlite3.connect("elogisticar.db")
@@ -355,7 +386,6 @@ def izmeni_vozilo(v: IzmenaVozila):
     konekcija.close()
     return {"status": "Uspešno"}
 
-# --- VOZAČI (Pregled, Promena šifre, Brisanje) ---
 @app.get("/svi-vozaci")
 def svi_vozaci():
     konekcija = sqlite3.connect("elogisticar.db")
@@ -383,7 +413,6 @@ def izmeni_sifru_vozaca(s: IzmenaSifre):
     konekcija.close()
     return {"status": "Uspešno"}
 
-# --- KUPCI (Pregled, Izmena, Brisanje) ---
 @app.get("/svi-kupci")
 def svi_kupci():
     konekcija = sqlite3.connect("elogisticar.db")

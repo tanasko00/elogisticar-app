@@ -376,19 +376,15 @@ async function ucitajTure() {
     const odg = await fetch("/sve-ture");
     let sveTure = await odg.json();
 
-    // Čitamo šta je izabrano u padajućem meniju (ako meni još nije učitan, podrazumijevamo "Sve")
     const filterElement = document.getElementById("filter-aktivnih");
     const izabraniStatus = filterElement ? filterElement.value : "Sve";
 
-    // 1. Filtriranje: Zadržavamo samo one koje NISU završene
     let aktivne = sveTure.filter(t => t.status !== "Završeno");
 
-    // 2. Primjena filtera iz padajućeg menija ("Na čekanju" ili "U toku")
     if (izabraniStatus !== "Sve") {
         aktivne = aktivne.filter(t => t.status === izabraniStatus);
     }
 
-    // 3. Sortiranje (najveći ID prvi) i ograničavanje na 10 rezultata
     const zaPrikaz = aktivne.sort((a, b) => b.id - a.id).slice(0, 10);
 
     const tbody = document.getElementById("tabela-tura");
@@ -735,3 +731,189 @@ function prikaziToast(poruka, tip = "uspeh") {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
+
+// CHAT LOGIKA
+let chatOtvoren = true;
+let poznatePoruke = new Set();
+let neprocitanoPoKanalu = {};
+let neprocitanihUkupno = 0;
+let zadnjiPrikazanBroj = -1;
+
+const korisnikIme = localStorage.getItem('korisnik_ime') || "Nepoznato";
+const korisnikRola = localStorage.getItem('korisnik_rola') || "Gost";
+
+function toggleChat() {
+    chatOtvoren = !chatOtvoren;
+    document.getElementById('chat-telo').style.display = chatOtvoren ? 'flex' : 'none';
+    document.getElementById('chat-toggle-ikona').innerText = chatOtvoren ? '▼' : '▲';
+    
+    if (chatOtvoren) {
+        neprocitanihUkupno = 0;
+        document.getElementById('chat-notifikacija').style.display = 'none';
+        
+        const aktKanal = document.getElementById("chat-primalac") ? document.getElementById("chat-primalac").value : "Svi";
+        neprocitanoPoKanalu[aktKanal] = 0;
+        azurirajImenaKanal();
+        
+        zadnjiPrikazanBroj = -1;
+        ucitajPoruke();
+    }
+}
+
+function promeniChatKanal() {
+    const aktKanal = document.getElementById("chat-primalac").value;
+    neprocitanoPoKanalu[aktKanal] = 0; 
+    azurirajImenaKanal();
+    
+    zadnjiPrikazanBroj = -1;
+    document.getElementById("chat-poruke").innerHTML = "";
+    ucitajPoruke();
+}
+
+function azurirajImenaKanal() {
+    const select = document.getElementById("chat-primalac");
+    if(!select) return;
+    
+    Array.from(select.options).forEach(opt => {
+        const originalIme = opt.getAttribute("data-ime") || opt.innerText;
+        if (!opt.hasAttribute("data-ime")) opt.setAttribute("data-ime", originalIme);
+        
+        const br = neprocitanoPoKanalu[opt.value] || 0;
+        if (br > 0) {
+            opt.innerText = `🔔 ${originalIme} (+${br})`;
+            opt.style.fontWeight = "bold";
+        } else {
+            opt.innerText = originalIme;
+            opt.style.fontWeight = "normal";
+        }
+    });
+}
+
+async function popuniChatVozace() {
+    const odg = await fetch("/svi-vozaci");
+    const vozaci = await odg.json();
+    const select = document.getElementById("chat-primalac");
+    if(select) {
+        select.innerHTML = '<option value="Svi" data-ime="Grupni chat (Svi vozači)">Grupni chat (Svi vozači)</option>';
+        vozaci.forEach(v => {
+            const opcija = document.createElement("option");
+            opcija.value = v.ime;
+            opcija.setAttribute("data-ime", `Vozač: ${v.ime} ${v.prezime}`);
+            opcija.innerText = `Vozač: ${v.ime} ${v.prezime}`;
+            select.appendChild(opcija);
+        });
+        azurirajImenaKanal();
+    }
+}
+
+async function ucitajPoruke() {
+    try {
+        const odg = await fetch("/poruke");
+        if (!odg.ok) return;
+        
+        const svePoruke = await odg.json();
+        const aktKanal = document.getElementById("chat-primalac") ? document.getElementById("chat-primalac").value : "Svi";
+        
+        let trebaRender = false;
+
+        
+        svePoruke.forEach(p => {
+            if (!poznatePoruke.has(p.id)) {
+                poznatePoruke.add(p.id); 
+                
+                
+                let kanalPoruke = "Svi";
+                if (p.primalac !== "Svi") {
+                    kanalPoruke = (p.ime === korisnikIme) ? p.primalac : p.ime;
+                }
+
+               
+                if (chatOtvoren && kanalPoruke === aktKanal) {
+                    trebaRender = true; 
+                } else {
+                    neprocitanoPoKanalu[kanalPoruke] = (neprocitanoPoKanalu[kanalPoruke] || 0) + 1;
+                    if (!chatOtvoren) neprocitanihUkupno++;
+                    if (kanalPoruke === aktKanal) trebaRender = true;
+                }
+            }
+        });
+
+       
+        if (!chatOtvoren && neprocitanihUkupno > 0) {
+            const bedz = document.getElementById('chat-notifikacija');
+            if (bedz) {
+                bedz.innerText = neprocitanihUkupno;
+                bedz.style.display = 'block';
+            }
+        }
+
+
+        azurirajImenaKanal();
+
+ 
+        if (trebaRender || zadnjiPrikazanBroj === -1) {
+            const filtriranePoruke = svePoruke.filter(p => {
+                if (aktKanal === "Svi") return p.primalac === "Svi";
+                return p.primalac === aktKanal || (p.ime === aktKanal && p.primalac === "Dispecer");
+            });
+
+            zadnjiPrikazanBroj = filtriranePoruke.length;
+            const kontejner = document.getElementById("chat-poruke");
+            if (kontejner) {
+                kontejner.innerHTML = filtriranePoruke.map(p => {
+                    const moja = p.ime === korisnikIme;
+                    const poravnanje = moja ? 'flex-end' : 'flex-start';
+                    const pozadina = moja ? '#3b82f6' : '#334155';
+                    const zaobljenje = moja ? '12px 12px 0 12px' : '12px 12px 12px 0';
+                    const bojaImena = moja ? '#bfdbfe' : '#94a3b8';
+                    const oznaka = p.primalac === 'Svi' ? '(svima)' : (p.primalac === 'Dispecer' ? '(dispečeru)' : '(privatno)');
+                    
+                    return `
+                    <div style="align-self: ${poravnanje}; background: ${pozadina}; max-width: 80%; padding: 8px 12px; border-radius: ${zaobljenje}; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+                        <div style="font-size: 10px; color: ${bojaImena}; margin-bottom: 4px;">
+                            ${p.ime} <span style="font-size: 9px; opacity: 0.7;">${oznaka}</span> 
+                        </div>
+                        <div style="color: white; line-height: 1.4;">${p.tekst}</div>
+                        <div style="font-size: 9px; color: ${bojaImena}; text-align: right; margin-top: 4px; opacity: 0.8;">
+                            ${p.vreme}
+                        </div>
+                    </div>`;
+                }).join("");
+                
+                if (chatOtvoren) kontejner.scrollTop = kontejner.scrollHeight;
+            }
+        }
+    } catch (e) { console.error("Chat greška:", e); }
+}
+
+async function posaljiPoruku() {
+    const unos = document.getElementById("chat-unos");
+    const tekst = unos.value.trim();
+    if (!tekst) return;
+    
+    const primalac = document.getElementById("chat-primalac") ? document.getElementById("chat-primalac").value : "Svi";
+    unos.value = ""; 
+    
+    await fetch("/posalji-poruku", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ime: korisnikIme, rola: korisnikRola, primalac: primalac, tekst: tekst })
+    });
+    ucitajPoruke(); 
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const chatInput = document.getElementById("chat-unos");
+    if(chatInput) {
+        chatInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") { 
+                e.preventDefault(); 
+                posaljiPoruku(); 
+            }
+        });
+    }
+    popuniChatVozace(); 
+});
+
+setInterval(ucitajPoruke, 3000);
+ucitajPoruke();

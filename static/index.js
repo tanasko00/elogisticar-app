@@ -5,7 +5,6 @@ document.getElementById('login-forma').addEventListener('submit', async function
     const greskaDiv = document.getElementById('poruka-greska');
 
     try {
-        // Pozivamo backend rutu /prijava
         const odgovor = await fetch('/prijava', {
             method: 'POST',
             headers: {
@@ -20,13 +19,11 @@ document.getElementById('login-forma').addEventListener('submit', async function
         if (odgovor.ok) {
             const podaci = await odgovor.json();
 
-            // Čuvamo podatke u browseru kako bi ih ostale stranice mogle čitati
             localStorage.setItem('korisnik_id', podaci.id);
             localStorage.setItem('korisnik_ime', podaci.ime);
             localStorage.setItem('korisnik_prezime', podaci.prezime);
             localStorage.setItem('korisnik_rola', podaci.rola);
 
-            // Pametno preusmeravanje na osnovu role
             if (podaci.rola === 'Dispecer') {
                 window.location.href = '/dispecer';
             } else {
