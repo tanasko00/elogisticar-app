@@ -173,8 +173,13 @@
                     <select id="voz_tip" onchange="document.getElementById('voz_nosivost').placeholder = this.value === 'Cisterna' ? 'Kapacitet (litara)' : 'Nosivost (tona)'">
                         <option value="Teretnjak">Teretnjak</option>
                         <option value="Cisterna">Cisterna</option>
+                        <option value="Prikoličar">Prikoličar</option>
+                        <option value="Hladnjača">Hladnjača</option>
+                        <option value="Šleper">Šleper</option>
+                        <option value="Kombi">Kombi</option>
+                        <option value="Kiper">Kiper</option>
                     </select>
-                    <input type="number" id="voz_nosivost" placeholder="Nosivost (tona)">
+                    <input type="number" id="voz_nosivost" placeholder="Nosivost/Litraža">
                     <button class="btn-zeleno" onclick="dodajVozilo()">Sačuvaj vozilo</button>
                 </div>
             </div>

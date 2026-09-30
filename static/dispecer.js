@@ -394,17 +394,21 @@ async function ucitajTure() {
         return;
     }
 
-    tbody.innerHTML = zaPrikaz.map(t =>
-        `<tr>
+    const redovi = await Promise.all(zaPrikaz.map(async (t) => {
+        const vremeBedz = await dohvatiVreme(t.odrediste);
+        
+        return `<tr>
             <td style="color: #3b82f6; font-weight: 500;">TR-${t.id + 2800}</td>
             <td>${t.vozac}</td>
             <td style="color: #94a3b8;">${t.vozilo}</td>
-            <td style="color: #94a3b8;">📍 ${t.polaziste} ➔ ${t.odrediste}</td>
+            <td style="color: #e2e8f0;">📍 ${t.polaziste} ➔ ${t.odrediste} ${vremeBedz}</td>
             <td style="color: #94a3b8;">${t.datum}</td>
             <td>${getStatusBadge(t.status)}</td>
             <td><button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button></td>
-        </tr>`
-    ).join('');
+        </tr>`;
+    }));
+
+    tbody.innerHTML = redovi.join('');
 }
 
 async function obrisiTuru(id) {
@@ -917,3 +921,120 @@ document.addEventListener("DOMContentLoaded", () => {
 
 setInterval(ucitajPoruke, 3000);
 ucitajPoruke();
+
+async function dohvatiVreme(grad) {
+    try {
+        let cistGrad = grad.trim();
+        
+        const prevod = {
+            "bukurest": "Bucharest",
+            "bukurešt": "Bucharest",
+            "beč": "Vienna",
+            "bec": "Vienna",
+            "solun": "Thessaloniki",
+            "budimpešta": "Budapest",
+            "budimpesta": "Budapest",
+            "pariz": "Paris",
+            "rim": "Rome",
+            "moskva": "Moscow",
+            "peking": "Beijing",   
+            "minhen": "Munich",
+            "keln": "Cologne",
+            "štutgart": "Stuttgart",
+            "stutgart": "Stuttgart",
+            "nirnberg": "Nuremberg",
+            "lajpcig": "Leipzig",
+            "hanover": "Hanover",
+            "milano": "Milan",
+            "venecija": "Venice",
+            "firenca": "Florence",
+            "đenova": "Genoa",
+            "denova": "Genoa",
+            "trst": "Trieste",
+            "napulj": "Naples",
+            "torino": "Turin",
+            "prag": "Prague",
+            "varšava": "Warsaw",
+            "varsava": "Warsaw",
+            "krakov": "Krakow",
+            "segedin": "Szeged",
+            "temišvar": "Timisoara",
+            "temisvar": "Timisoara",
+            "sofija": "Sofia",
+            "atina": "Athens",          
+            "brisel": "Brussels",
+            "antverpen": "Antwerp",
+            "hag": "The Hague",
+            "ženeva": "Geneva",
+            "zeneva": "Geneva",
+            "cirih": "Zurich",
+            "barselona": "Barcelona",
+            "sevilja": "Seville",
+            "lisabon": "Lisbon",
+            "kopenhagen": "Copenhagen",
+            "stokholm": "Stockholm",
+            "geteborg": "Gothenburg",
+            "marsej": "Marseille"
+        };
+
+        const kljuc = cistGrad.toLowerCase();
+        if (prevod[kljuc]) {
+            cistGrad = prevod[kljuc];
+        }
+
+        const geoOdg = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cistGrad)}&count=1`);
+        const geoPodaci = await geoOdg.json();
+        
+        if (!geoPodaci.results || geoPodaci.results.length === 0) return "";
+        
+        const lat = geoPodaci.results[0].latitude;
+        const lon = geoPodaci.results[0].longitude;
+        
+        const vremeOdg = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+        const vremePodaci = await vremeOdg.json();
+        
+        const temp = Math.round(vremePodaci.current_weather.temperature);
+        const kod = vremePodaci.current_weather.weathercode;
+        
+        let ikona = "☀️️"; 
+        if (kod >= 1 && kod <= 3) ikona = "⛅"; 
+        if (kod >= 45 && kod <= 48) ikona = "🌫️"; 
+        if (kod >= 51 && kod <= 67) ikona = "🌧️"; 
+        if (kod >= 71 && kod <= 77) ikona = "❄️"; 
+        if (kod >= 80 && kod <= 82) ikona = "🌦️"; 
+        if (kod >= 95) ikona = "⛈️"; 
+        
+        return `<span style="background: #0ea5e9; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 4px;">${ikona} ${temp}°C</span>`;
+    } catch (e) {
+        console.error("Greška pri učitavanju vremena:", e);
+        return ""; 
+    }
+}
+
+let sacuvanoStanjeTura = "";
+
+async function pametnoOsvezavanje() {
+    try {
+        const odg = await fetch("/sve-ture");
+        if (!odg.ok) return;
+        const sveTure = await odg.json();
+        
+        const novoStanje = JSON.stringify(sveTure);
+
+        if (novoStanje !== sacuvanoStanjeTura) {
+            const inicijalnoUcitavanje = (sacuvanoStanjeTura === "");
+            sacuvanoStanjeTura = novoStanje;
+            
+            if (!inicijalnoUcitavanje) {
+                console.log("🔄 Detektovana promena u bazi!");
+                
+                ucitajTure(); 
+                osveziKalendar();
+            }
+        }
+    } catch (e) {
+        console.error("Greška pri sinhronizaciji:", e);
+    }
+}
+
+setInterval(pametnoOsvezavanje, 5000);

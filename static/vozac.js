@@ -44,7 +44,7 @@ function primeniFilter() {
     renderTure(filtriraneTure);
 }
 
-function renderTure(ture) {
+async function renderTure(ture) {
     const kontejner = document.getElementById('lista-tura');
     
     if (ture.length === 0) {
@@ -56,7 +56,7 @@ function renderTure(ture) {
         return;
     }
 
-    kontejner.innerHTML = ture.map(t => {
+    const redovi = await Promise.all(ture.map(async (t) => {
         let statusBadge = '';
         let akcionoDugme = '';
 
@@ -71,12 +71,13 @@ function renderTure(ture) {
             akcionoDugme = ``; 
         }
 
-        
         const urlMape = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(t.polaziste)}&destination=${encodeURIComponent(t.odrediste)}`;
         const navigacijaDugme = `<a href="${urlMape}" target="_blank" class="btn-akcija" style="background-color: #334155; color: white; text-decoration: none;">Navigacija</a>`;
         const akcijeHtml = (t.status !== 'Završeno') 
             ? `<div class="akcije">${akcionoDugme}${navigacijaDugme}</div>` 
             : ``;
+
+        const vremeBedz = await dohvatiVreme(t.odrediste);
 
         return `
             <div class="kartica">
@@ -87,7 +88,7 @@ function renderTure(ture) {
                 <div class="kartica-body">
                     <div class="info-red">
                         <span class="ikona">📍</span> 
-                        <span><strong>${t.polaziste}</strong> ➔ <strong>${t.odrediste}</strong></span>
+                        <span><strong>${t.polaziste}</strong> ➔ <strong>${t.odrediste}</strong> ${vremeBedz}</span>
                     </div>
                     <div class="info-red">
                         <span class="ikona">🚚</span> 
@@ -100,7 +101,9 @@ function renderTure(ture) {
                 ${akcijeHtml}
             </div>
         `;
-    }).join('');
+    }));
+
+    kontejner.innerHTML = redovi.join('');
 }
 
 async function promeniStatus(idTure, noviStatus) {
@@ -166,7 +169,7 @@ function prikaziToast(poruka, tip = "uspeh") {
 }
 
 // CHAT LOGIKA
-let chatOtvoren = true;
+let chatOtvoren = false;
 let poznatePoruke = new Set();
 let neprocitanoPoKanalu = { "Svi": 0, "Dispecer": 0 };
 let neprocitanihUkupno = 0;
@@ -323,3 +326,89 @@ document.addEventListener("DOMContentLoaded", () => {
 
 setInterval(ucitajPoruke, 3000);
 ucitajPoruke();
+
+async function dohvatiVreme(grad) {
+    try {
+        let cistGrad = grad.trim();
+        const prevod = {
+            "bukurest": "Bucharest",
+            "bukurešt": "Bucharest",
+            "beč": "Vienna",
+            "bec": "Vienna",
+            "solun": "Thessaloniki",
+            "budimpešta": "Budapest",
+            "budimpesta": "Budapest",
+            "pariz": "Paris",
+            "rim": "Rome",
+            "moskva": "Moscow",
+            "peking": "Beijing",   
+            "minhen": "Munich",
+            "keln": "Cologne",
+            "štutgart": "Stuttgart",
+            "stutgart": "Stuttgart",
+            "nirnberg": "Nuremberg",
+            "lajpcig": "Leipzig",
+            "hanover": "Hanover",
+            "milano": "Milan",
+            "venecija": "Venice",
+            "firenca": "Florence",
+            "đenova": "Genoa",
+            "denova": "Genoa",
+            "trst": "Trieste",
+            "napulj": "Naples",
+            "torino": "Turin",
+            "prag": "Prague",
+            "varšava": "Warsaw",
+            "varsava": "Warsaw",
+            "krakov": "Krakow",
+            "segedin": "Szeged",
+            "temišvar": "Timisoara",
+            "temisvar": "Timisoara",
+            "sofija": "Sofia",
+            "atina": "Athens",          
+            "brisel": "Brussels",
+            "antverpen": "Antwerp",
+            "hag": "The Hague",
+            "ženeva": "Geneva",
+            "zeneva": "Geneva",
+            "cirih": "Zurich",
+            "barselona": "Barcelona",
+            "sevilja": "Seville",
+            "lisabon": "Lisbon",
+            "kopenhagen": "Copenhagen",
+            "stokholm": "Stockholm",
+            "geteborg": "Gothenburg",
+            "marsej": "Marseille"
+        };
+
+        const kljuc = cistGrad.toLowerCase();
+        if (prevod[kljuc]) cistGrad = prevod[kljuc];
+
+        const geoOdg = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cistGrad)}&count=1`);
+        const geoPodaci = await geoOdg.json();
+        
+        if (!geoPodaci.results || geoPodaci.results.length === 0) return "";
+        
+        const lat = geoPodaci.results[0].latitude;
+        const lon = geoPodaci.results[0].longitude;
+        
+        const vremeOdg = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+        const vremePodaci = await vremeOdg.json();
+        
+        const temp = Math.round(vremePodaci.current_weather.temperature);
+        const kod = vremePodaci.current_weather.weathercode;
+        
+        let ikona = "☀️"; 
+        if (kod >= 1 && kod <= 3) ikona = "⛅"; 
+        if (kod >= 45 && kod <= 48) ikona = "🌫️"; 
+        if (kod >= 51 && kod <= 67) ikona = "🌧️"; 
+        if (kod >= 71 && kod <= 77) ikona = "❄️"; 
+        if (kod >= 80 && kod <= 82) ikona = "🌦️"; 
+        if (kod >= 95) ikona = "⛈️"; 
+        
+        return `<span style="background: #0ea5e9; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 4px;">${ikona} ${temp}°C</span>`;
+    } catch (e) {
+        console.error("Greška pri učitavanju vremena:", e);
+        return ""; 
+    }
+}
