@@ -14,6 +14,51 @@ def inicijalizuj_bazu():
     konekcija = sqlite3.connect("elogisticar.db")
     kursor = konekcija.cursor()
     
+    kursor.execute("""
+        CREATE TABLE IF NOT EXISTS Korisnik (
+            Id_Korisnika INTEGER PRIMARY KEY AUTOINCREMENT,
+            Ime TEXT,
+            Prezime TEXT,
+            Rola TEXT,
+            Sifra TEXT
+        )
+    """)
+
+    kursor.execute("""
+        CREATE TABLE IF NOT EXISTS Vozilo (
+            Registarski_br TEXT PRIMARY KEY,
+            Marka TEXT,
+            Nosivost REAL,
+            Tip_vozila TEXT
+        )
+    """)
+
+    kursor.execute("""
+        CREATE TABLE IF NOT EXISTS Kupac (
+            PIB_Kupca TEXT PRIMARY KEY,
+            Naziv_kompanije TEXT,
+            Adresa TEXT
+        )
+    """)
+
+    kursor.execute("""
+        CREATE TABLE IF NOT EXISTS Tura (
+            ID_Ture INTEGER PRIMARY KEY AUTOINCREMENT,
+            Id_Korisnika INTEGER,
+            Registarski_br TEXT,
+            PIB_Kupca TEXT,
+            Polaziste TEXT,
+            stajaliste TEXT DEFAULT '',
+            Odrediste TEXT,
+            kilometraza INTEGER DEFAULT 0,
+            km_do_stajalista INTEGER DEFAULT 0,
+            Status_Realizacije TEXT DEFAULT 'Na čekanju',
+            Datum TEXT DEFAULT '2026-09-29',
+            FOREIGN KEY (Id_Korisnika) REFERENCES Korisnik(Id_Korisnika),
+            FOREIGN KEY (Registarski_br) REFERENCES Vozilo(Registarski_br)
+        )
+    """)
+
     try:
         kursor.execute("ALTER TABLE Tura ADD COLUMN Datum TEXT DEFAULT '2026-09-29'")
     except:
@@ -23,10 +68,12 @@ def inicijalizuj_bazu():
         kursor.execute("ALTER TABLE Tura ADD COLUMN stajaliste TEXT DEFAULT ''")
     except:
         pass
+
     try:
         kursor.execute("ALTER TABLE Tura ADD COLUMN kilometraza INTEGER DEFAULT 0")
     except:
         pass
+
     try:
         kursor.execute("ALTER TABLE Tura ADD COLUMN km_do_stajalista INTEGER DEFAULT 0")
     except:
@@ -43,7 +90,7 @@ def inicijalizuj_bazu():
             FOREIGN KEY (ID_Ture) REFERENCES Tura(ID_Ture)
         )
     """)
-    
+
     kursor.execute('''
         CREATE TABLE IF NOT EXISTS poruke (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,12 +107,16 @@ def inicijalizuj_bazu():
         pass
 
     kursor.execute("""
-    CREATE TABLE IF NOT EXISTS gradovi (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        naziv TEXT UNIQUE NOT NULL
-    )
+        CREATE TABLE IF NOT EXISTS gradovi (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            naziv TEXT UNIQUE NOT NULL
+        )
     """)
     
+    kursor.execute("SELECT COUNT(*) FROM Korisnik WHERE Rola='Dispecer'")
+    if kursor.fetchone()[0] == 0:
+        kursor.execute("INSERT INTO Korisnik (Ime, Prezime, Rola, Sifra) VALUES ('Test', 'Dispecer', 'Dispecer', 'Test123')")
+
     kursor.execute("SELECT COUNT(*) FROM gradovi")
     if kursor.fetchone()[0] == 0:
         pocetni_gradovi = [
