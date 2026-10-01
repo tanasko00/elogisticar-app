@@ -1117,7 +1117,6 @@ async function dobijKoordinate(grad) {
     if (!grad) return null;
     try {
         let cistGrad = grad.trim().toLowerCase();
-        // Pametni rječnik za prevod 
         const prevod = { "bukurest": "Bucharest", "bukurešt": "Bucharest", "beč": "Vienna", "bec": "Vienna", "solun": "Thessaloniki", "budimpešta": "Budapest", "budimpesta": "Budapest", "pariz": "Paris", "rim": "Rome", "moskva": "Moscow", "peking": "Beijing", "minhen": "Munich", "keln": "Cologne", "štutgart": "Stuttgart", "stutgart": "Stuttgart", "nirnberg": "Nuremberg", "lajpcig": "Leipzig", "hanover": "Hanover", "milano": "Milan", "venecija": "Venice", "firenca": "Florence", "đenova": "Genoa", "denova": "Genoa", "trst": "Trieste", "napulj": "Naples", "torino": "Turin", "prag": "Prague", "varšava": "Warsaw", "varsava": "Warsaw", "krakov": "Krakow", "segedin": "Szeged", "temišvar": "Timisoara", "temisvar": "Timisoara", "sofija": "Sofia", "atina": "Athens", "brisel": "Brussels", "antverpen": "Antwerp", "hag": "The Hague", "ženeva": "Geneva", "zeneva": "Geneva", "cirih": "Zurich", "barselona": "Barcelona", "sevilja": "Seville", "lisabon": "Lisbon", "kopenhagen": "Copenhagen", "stokholm": "Stockholm", "geteborg": "Gothenburg", "marsej": "Marseille", "rio de zaneiro": "Rio de Janeiro", "rio de žaneiro": "Rio de Janeiro", "rio": "Rio de Janeiro" };
         
         if (prevod[cistGrad]) cistGrad = prevod[cistGrad];

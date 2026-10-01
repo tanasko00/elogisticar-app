@@ -94,9 +94,12 @@ async function renderTure(ture) {
             preostaloKm = 0;
         }
 
-        let urlMape = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(t.polaziste)}&destination=${encodeURIComponent(t.odrediste)}`;
+        let urlMape = "";
+
         if (t.stajaliste && t.stajaliste.trim() !== "") {
-            urlMape += `&waypoints=${encodeURIComponent(t.stajaliste)}`;
+            urlMape = `https://maps.google.com/maps?saddr=${encodeURIComponent(t.polaziste)}&daddr=${encodeURIComponent(t.stajaliste)}+to:${encodeURIComponent(t.odrediste)}`;
+        } else {
+            urlMape = `https://maps.google.com/maps?saddr=${encodeURIComponent(t.polaziste)}&daddr=${encodeURIComponent(t.odrediste)}`;
         }
         const navigacijaDugme = `<a href="${urlMape}" target="_blank" class="btn-akcija" style="flex: 1; background-color: #334155; color: white; text-decoration: none; text-align: center; padding: 10px; border-radius: 8px; font-weight: bold;">Navigacija</a>`;
         
