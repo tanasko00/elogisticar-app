@@ -16,6 +16,23 @@ document.getElementById("izbor_vozila").addEventListener("change", function() {
     osveziPrikazKapaciteta();
 });
 
+
+function izracunajTezinu(robaTekst) {
+    const regex = /(\d+(?:\.\d+)?)\s*(kg|t|l|lit)/i;
+    const poklapanje = robaTekst.match(regex);
+    
+    if (!poklapanje) return 0; 
+    
+    const broj = parseFloat(poklapanje[1]);
+    const jedinica = poklapanje[2].toLowerCase();
+    
+    if (jedinica === 'kg') {
+        return broj / 1000; 
+    } 
+    return broj; 
+}
+
+
 function promijeniTab(idTaba, element) {
     document.querySelectorAll('.sadrzaj-taba').forEach(tab => tab.style.display = 'none');
     document.querySelectorAll('.nav-item').forEach(link => link.classList.remove('active'));
@@ -243,13 +260,7 @@ function osveziPrikazKapaciteta() {
 
     let trenutnoZauzeto = 0;
     trenutniZahtevi.forEach(zahtev => {
-        const zMala = zahtev.roba.toLowerCase();
-        const m = zahtev.roba.match(/\d+(\.\d+)?/);
-        if (m) {
-            let b = parseFloat(m[0]);
-            if (tipVozila === "Teretnjak" && (zMala.includes("kg") || zMala.includes("kilogram"))) b = b / 1000;
-            trenutnoZauzeto += b;
-        }
+        trenutnoZauzeto += izracunajTezinu(zahtev.roba); 
     });
 
     const preostalo = maxNosivost - trenutnoZauzeto;
@@ -259,15 +270,15 @@ function osveziPrikazKapaciteta() {
 
     kontejner.style.display = "block";
     kontejner.innerHTML = `
-                <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
-                    <span>Kapacitet: <strong>${maxNosivost} ${jedinica}</strong></span>
-                    <span>Utovareno: <strong>${trenutnoZauzeto} ${jedinica}</strong> (${procenat}%)</span>
-                    <span style="color: ${bojaStatusa}; font-weight: 600;">Slobodno još: ${preostalo.toFixed(2)} ${jedinica}</span>
-                </div>
-                <div style="width: 100%; background: #1e293b; height: 8px; border-radius: 4px; overflow: hidden;">
-                    <div style="width: ${Math.min(procenat, 100)}%; background: ${trakaBoja}; height: 100%; transition: width 0.3s ease;"></div>
-                </div>
-            `;
+        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+            <span>Kapacitet: <strong>${maxNosivost} ${jedinica}</strong></span>
+            <span>Utovareno: <strong>${trenutnoZauzeto.toFixed(2)} ${jedinica}</strong> (${procenat}%)</span>
+            <span style="color: ${bojaStatusa}; font-weight: 600;">Slobodno još: ${preostalo.toFixed(2)} ${jedinica}</span>
+        </div>
+        <div style="width: 100%; background: #1e293b; height: 8px; border-radius: 4px; overflow: hidden;">
+            <div style="width: ${Math.min(procenat, 100)}%; background: ${trakaBoja}; height: 100%; transition: width 0.3s ease;"></div>
+        </div>
+    `;
 }
 
 function dodajPrivremeniZahtev() {
@@ -283,12 +294,9 @@ function dodajPrivremeniZahtev() {
 
     const tipVozila = voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-tip");
     const maksimalnaNosivost = parseFloat(voziloSelect.options[voziloSelect.selectedIndex].getAttribute("data-nosivost"));
-
-    const match = robaInput.match(/\d+(\.\d+)?/);
-    if (!match) return alert("Morate uneti količinu u brojevima (npr. '500 kg', '2 t' ili '1000 l').");
-    let unetiBroj = parseFloat(match[0]);
     const robaMala = robaInput.toLowerCase();
 
+    
     if (tipVozila === "Cisterna" && (robaMala.includes("palet") || robaMala.includes("kutij") || robaMala.includes("kg") || robaMala.includes("ton"))) {
         return alert("Greška: Cisterna prima isključivo tečnost u litrima!");
     }
@@ -296,22 +304,19 @@ function dodajPrivremeniZahtev() {
         return alert("Greška: Tečnosti u litrima idu u cisternu!");
     }
 
-    let kolicinaZaPoređenje = unetiBroj;
-    if (tipVozila === "Teretnjak" && (robaMala.includes("kg") || robaMala.includes("kilogram"))) {
-        kolicinaZaPoređenje = unetiBroj / 1000;
+    
+    const kolicinaZaPoređenje = izracunajTezinu(robaInput);
+    if (kolicinaZaPoređenje === 0) {
+        return alert("Morate uneti količinu u brojevima sa jedinicom (npr. '500 kg', '2 t' ili '1000 l').");
     }
 
+    
     let trenutnoZauzeto = 0;
     trenutniZahtevi.forEach(zahtev => {
-        const zMala = zahtev.roba.toLowerCase();
-        const m = zahtev.roba.match(/\d+(\.\d+)?/);
-        if (m) {
-            let b = parseFloat(m[0]);
-            if (tipVozila === "Teretnjak" && (zMala.includes("kg") || zMala.includes("kilogram"))) b = b / 1000;
-            trenutnoZauzeto += b;
-        }
+        trenutnoZauzeto += izracunajTezinu(zahtev.roba);
     });
 
+   
     if (trenutnoZauzeto + kolicinaZaPoređenje > maksimalnaNosivost) {
         if (tipVozila === "Cisterna") return alert(` Prekoračenje kapaciteta cisterne!\nMax: ${maksimalnaNosivost} L.`);
         else return alert(` Prekoračenje nosivosti teretnjaka!\nMax: ${maksimalnaNosivost} t.`);
