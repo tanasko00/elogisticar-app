@@ -108,6 +108,7 @@ async function renderTure(ture) {
             : ``;
 
         const vremeBedz = await dohvatiVreme(t.odrediste);
+        const vremeStajalisteBedz = t.stajaliste ? await dohvatiVreme(t.stajaliste) : '';
 
         const bojaStajalista = (t.status === 'Ka odredištu' || t.status === 'Završeno') ? '#10b981' : '#f59e0b';
         const ikonaStajalista = (t.status === 'Ka odredištu' || t.status === 'Završeno') ? '✓' : '🚛';
@@ -117,7 +118,7 @@ async function renderTure(ture) {
             <div style="display: flex; align-items: center; gap: 12px;">
                 <div style="width: 24px; height: 24px; border-radius: 50%; border: 1px solid ${bojaStajalista}; background: ${(t.status === 'Ka odredištu' || t.status === 'Završeno') ? '#10b981' : 'transparent'}; display: flex; align-items: center; justify-content: center; font-size: 11px; color: white;">${ikonaStajalista}</div>
                 <div>
-                    <div style="font-size: 14px; font-weight: 600; color: white;">${t.stajaliste}</div>
+                    <div style="font-size: 14px; font-weight: 600; color: white;">${t.stajaliste} ${vremeStajalisteBedz}</div>
                     <span style="background: ${bojaStajalista}33; color: ${bojaStajalista}; font-size: 10px; padding: 2px 6px; border-radius: 4px;">Stajalište (Istovar)</span>
                 </div>
             </div>

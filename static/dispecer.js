@@ -678,7 +678,6 @@ function stampajPutniNalog(idTure) {
         ? `${tura.polaziste} ➔ ${tura.stajaliste} ➔ ${tura.odrediste}` 
         : `${tura.polaziste} ➔ ${tura.odrediste}`;
 
-    // Sada backend šalje čiste podatke koje samo preuzimamo
     const imeKlijenta = tura.kupac; 
     const opisTereta = tura.roba;
 
