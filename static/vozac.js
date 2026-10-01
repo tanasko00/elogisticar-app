@@ -72,9 +72,9 @@ async function renderTure(ture) {
             statusBoja = '#10b981'; 
             if (t.stajaliste) {
                 prikazStatusa = 'Ka stajalištu';
-                navigacijaCilj = t.stajaliste; // Navigacija vodi samo do stajališta
+                navigacijaCilj = t.stajaliste; 
                 procenat = ukupnoKm > 0 ? Math.round((kmDoStajalista / ukupnoKm) * 100) : 30;
-                if(procenat > 90) procenat = 90; // Vizuelna korekcija
+                if(procenat > 90) procenat = 90; 
                 preostaloKm = kmDoOdredista > 0 ? kmDoOdredista : Math.round(ukupnoKm * 0.5); 
                 
                 akcionoDugme = `<button class="btn-akcija btn-zavrsi" onclick="promeniStatus(${t.id}, 'Ka odredištu')" style="flex: 1; background-color: #f59e0b; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold;">✔ Istovareno (Stajalište)</button>`;
@@ -94,7 +94,10 @@ async function renderTure(ture) {
             preostaloKm = 0;
         }
 
-        const urlMape = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(t.polaziste)}&destination=${encodeURIComponent(navigacijaCilj)}`;
+        let urlMape = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(t.polaziste)}&destination=${encodeURIComponent(t.odrediste)}`;
+        if (t.stajaliste && t.stajaliste.trim() !== "") {
+            urlMape += `&waypoints=${encodeURIComponent(t.stajaliste)}`;
+        }
         const navigacijaDugme = `<a href="${urlMape}" target="_blank" class="btn-akcija" style="flex: 1; background-color: #334155; color: white; text-decoration: none; text-align: center; padding: 10px; border-radius: 8px; font-weight: bold;">Navigacija</a>`;
         
         const akcijeHtml = (t.status !== 'Završeno') 
