@@ -265,7 +265,7 @@ def dodaj_turu(tura: PodaciZaTuru):
         """, (tura.datum, tura.registracija, tura.id_vozaca))
         
         if kursor.fetchone():
-            raise HTTPException(status_code=400, detail="Vozač ili vozilo su već zauzeti!")
+            raise HTTPException(status_code=400, detail="Greška: Izabrani vozač ili vozilo su već zauzeti na ovaj datum!")
 
         kursor.execute("""
             INSERT INTO Tura (Id_Korisnika, Registarski_br, PIB_Kupca, Polaziste, stajaliste, Odrediste, kilometraza, km_do_stajalista, Status_Realizacije, Datum) 
@@ -283,6 +283,9 @@ def dodaj_turu(tura: PodaciZaTuru):
         
         konekcija.commit()
         return {"status": "Uspešno"}
+        
+    except HTTPException:
+        raise
     except Exception as g: 
         raise HTTPException(status_code=500, detail=str(g))
     finally: 

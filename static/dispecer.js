@@ -114,9 +114,12 @@ function renderArhivaTura(ture) {
                     <td style="color: #94a3b8;">📍 ${t.polaziste} ➔ ${t.odrediste}</td>
                     <td style="color: #94a3b8;">${t.datum}</td>
                     <td>${getStatusBadge(t.status)}</td>
+                    
                     <td style="display: flex; gap: 8px;">
                         <button style="background-color: #3b82f6; color: white; border: none; padding: 6px 12px; font-size: 12px; border-radius: 6px; cursor: pointer;" onclick="stampajPutniNalog(${t.id})">🖨️ PDF</button>
-                        <button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button>
+                        ${t.status === 'Završeno' 
+                            ? `<button class="btn-crveno" style="opacity: 0.5; cursor: not-allowed;" title="Završene ture se ne mogu brisati">Obriši</button>` 
+                            : `<button class="btn-crveno" onclick="obrisiTuru(${t.id})">Obriši</button>`}
                     </td>
                 </tr>`
     ).join('');
@@ -434,13 +437,32 @@ async function ucitajTure() {
 }
 
 async function obrisiTuru(id) {
-    if (confirm("Obriši turu?")) {
-        await fetch(`/obrisi-turu/${id}`, {
-            method: "DELETE"
-        });
-        ucitajTure();
-        osveziKalendar();
-        osveziStatistiku();
+    if (confirm("Da li ste sigurni da želite obrisati turu?")) {
+        try {
+            const odgovor = await fetch(`/obrisi-turu/${id}`, {
+                method: "DELETE"
+            });
+            
+            if (odgovor.ok) {
+                sveTurePodaci = sveTurePodaci.filter(t => t.id != id);
+                
+                filtrirajArhivu();
+                
+                const odg = await fetch("/sve-ture", { cache: "no-store" });
+                sveTurePodaci = await odg.json();
+                
+                ucitajTure();
+                osveziKalendar();
+                osveziStatistiku();
+                
+                prikaziToast("Tura je uspešno obrisana!", "uspeh");
+            } else {
+                prikaziToast("Sistem je odbio brisanje ture.", "greska");
+            }
+        } catch (err) {
+            console.error("Greška pri brisanju:", err);
+            prikaziToast("Greška u komunikaciji sa serverom.", "greska");
+        }
     }
 }
 
