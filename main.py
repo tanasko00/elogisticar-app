@@ -390,9 +390,19 @@ def dohvati_ture():
     
     rezultat = []
     for t in ture_baza:
-        kursor.execute("SELECT Roba FROM Zahtev WHERE ID_Ture = ?", (t[0],))
-        roba_baza = kursor.fetchall()
-        teret_tekst = ", ".join([r[0] for r in roba_baza]) if roba_baza else "Nema specificiranog tereta"
+        kursor.execute("""
+            SELECT Kupac.Naziv_kompanije, Zahtev.Roba 
+            FROM Zahtev 
+            LEFT JOIN Kupac ON Zahtev.PIB_Kupca = Kupac.PIB_Kupca
+            WHERE Zahtev.ID_Ture = ?
+        """, (t[0],))
+        stavke = kursor.fetchall()
+        
+        klijenti_lista = list(set([s[0] for s in stavke if s[0]])) 
+        roba_lista = [s[1] for s in stavke if s[1]]
+        
+        klijenti_tekst = ", ".join(klijenti_lista) if klijenti_lista else "Zbirni transport"
+        teret_tekst = ", ".join(roba_lista) if roba_lista else "Nema specificiranog tereta"
         
         rezultat.append({
             "id": t[0], 
@@ -404,7 +414,8 @@ def dohvati_ture():
             "kilometraza": t[7] or 0,      
             "status": t[8], 
             "datum": t[9],
-            "kupac": teret_tekst           
+            "kupac": klijenti_tekst,  
+            "roba": teret_tekst
         })
         
     konekcija.close()
